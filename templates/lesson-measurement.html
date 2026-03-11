@@ -1,0 +1,617 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>测量与单位 - AetherViz 小学教学</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r134/three.min.js"></script>
+    <style>
+        :root {
+            --primary-gradient: linear-gradient(135deg, #F59E0B 0%, #EF4444 100%);
+            --bg-gradient: linear-gradient(180deg, #0F172A 0%, #7C2D12 50%, #9A3412 100%);
+        }
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: 'Inter', sans-serif;
+            background: var(--bg-gradient);
+            color: #F8FAFC;
+            font-size: 18px;
+            overflow-x: hidden;
+        }
+        #canvas-container { position: fixed; top: 0; left: 0; width: 100%; height: 100%; z-index: 0; }
+        #static-container {
+            position: fixed;
+            top: 70px;
+            left: 0;
+            width: 100%;
+            height: calc(100vh - 70px);
+            display: none;
+            justify-content: center;
+            align-items: center;
+            z-index: 1;
+            background: var(--bg-gradient);
+        }
+        #static-container.active {
+            display: flex;
+        }
+        .static-diagram {
+            max-width: 90%;
+            max-height: 90%;
+            background: rgba(255, 255, 255, 0.05);
+            border-radius: 20px;
+            padding: 40px;
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+        }
+        .navbar {
+            position: fixed; top: 0; left: 0; right: 0; height: 70px;
+            background: rgba(15, 23, 42, 0.85); backdrop-filter: blur(10px);
+            border-bottom: 2px solid rgba(245, 158, 11, 0.3);
+            display: flex; align-items: center; justify-content: space-between;
+            padding: 0 24px; z-index: 100;
+        }
+        .navbar-title { font-size: 32px; font-weight: bold; background: var(--primary-gradient); -webkit-background-clip: text; -webkit-text-fill-color: transparent; }
+        .btn-kid {
+            min-width: 60px; min-height: 60px; padding: 16px 24px;
+            font-size: 18px; border-radius: 12px; border: none;
+            background: var(--primary-gradient); color: white;
+            cursor: pointer; transition: all 0.3s ease;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+        }
+        .btn-kid:hover { transform: scale(1.05); }
+        .control-panel {
+            position: fixed; right: 0; top: 70px; width: 30%;
+            height: calc(100vh - 70px); background: rgba(124, 45, 18, 0.7);
+            backdrop-filter: blur(10px); border-left: 1px solid rgba(245, 158, 11, 0.25);
+            padding: 24px; overflow-y: auto; z-index: 90;
+        }
+        input[type="range"].kid-slider {
+            -webkit-appearance: none; width: 100%; height: 12px;
+            border-radius: 6px; background: rgba(255, 255, 255, 0.2);
+            cursor: pointer;
+        }
+        input[type="range"].kid-slider::-webkit-slider-thumb {
+            -webkit-appearance: none; width: 32px; height: 32px;
+            border-radius: 50%; background: var(--primary-gradient); cursor: pointer;
+        }
+        .unit-display {
+            text-align: center; padding: 16px;
+            background: rgba(255, 255, 255, 0.05);
+            border-radius: 12px; margin: 16px 0;
+        }
+        .conversion-display {
+            font-size: 20px; font-weight: bold;
+            color: #FBBF24; margin-top: 8px;
+        }
+        .tab-buttons {
+            display: flex; gap: 8px; margin-bottom: 16px;
+        }
+        .tab-btn {
+            flex: 1; padding: 12px; border-radius: 8px;
+            border: 2px solid rgba(255, 255, 255, 0.2);
+            background: rgba(255, 255, 255, 0.1);
+            color: white; cursor: pointer; transition: all 0.3s;
+        }
+        .tab-btn.active {
+            background: var(--primary-gradient);
+            border-color: transparent;
+        }
+        .info-box {
+            padding: 16px; background: rgba(255,255,255,0.05);
+            border-radius: 12px; margin-top: 16px;
+        }
+
+        /* 移动端优化 */
+        @media (max-width: 640px) {
+            .navbar {
+                padding: 0 12px;
+                height: 56px;
+            }
+            .navbar-title {
+                font-size: 20px;
+            }
+            .btn-kid {
+                min-width: 44px;
+                min-height: 44px;
+                padding: 10px 12px;
+                font-size: 14px;
+            }
+            .control-panel {
+                width: 100%;
+                height: 50vh;
+                top: 56px;
+            }
+            body {
+                font-size: 16px;
+            }
+        }
+
+        /* 平板端优化 */
+        @media (min-width: 641px) and (max-width: 1024px) {
+            .control-panel {
+                width: 40%;
+            }
+            .navbar-title {
+                font-size: 26px;
+            }
+        }
+
+        /* 触摸设备优化 */
+        @media (hover: none) and (pointer: coarse) {
+            input[type="range"].kid-slider::-webkit-slider-thumb {
+                width: 40px;
+                height: 40px;
+            }
+            .btn-kid {
+                min-height: 48px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div id="canvas-container"></div>
+
+    <!-- 静态展示容器 -->
+    <div id="static-container">
+        <div class="static-diagram">
+            <svg width="600" height="550" viewBox="0 0 600 550">
+                <!-- 标题 -->
+                <text x="300" y="40" text-anchor="middle" fill="#F8FAFC" font-size="28" font-weight="bold">
+                    测量与单位
+                </text>
+
+                <!-- 长度单位对比 -->
+                <g transform="translate(30, 70)">
+                    <rect x="0" y="0" width="250" height="150" fill="rgba(255,255,255,0.1)" rx="10"/>
+                    <text x="125" y="30" text-anchor="middle" fill="#F8FAFC" font-size="20" font-weight="bold">📏 长度单位</text>
+
+                    <!-- 厘米尺 -->
+                    <rect x="30" y="50" width="180" height="30" fill="#F59E0B" stroke="#FFFFFF" stroke-width="2"/>
+                    <line x1="30" y1="80" x2="30" y2="60" stroke="#FFFFFF" stroke-width="2"/>
+                    <line x1="60" y1="80" x2="60" y2="65" stroke="#FFFFFF" stroke-width="1"/>
+                    <line x1="90" y1="80" x2="90" y2="65" stroke="#FFFFFF" stroke-width="1"/>
+                    <line x1="120" y1="80" x2="120" y2="60" stroke="#FFFFFF" stroke-width="2"/>
+                    <line x1="150" y1="80" x2="150" y2="65" stroke="#FFFFFF" stroke-width="1"/>
+                    <line x1="180" y1="80" x2="180" y2="65" stroke="#FFFFFF" stroke-width="1"/>
+                    <line x1="210" y1="80" x2="210" y2="60" stroke="#FFFFFF" stroke-width="2"/>
+                    <text x="125" y="105" text-anchor="middle" fill="#F8FAFC" font-size="16">1 厘米 = 10 毫米</text>
+                    <text x="30" y="125" text-anchor="middle" fill="#FBBF24" font-size="14">0</text>
+                    <text x="120" y="125" text-anchor="middle" fill="#FBBF24" font-size="14">1cm</text>
+                    <text x="210" y="125" text-anchor="middle" fill="#FBBF24" font-size="14">2cm</text>
+                </g>
+
+                <!-- 面积网格 -->
+                <g transform="translate(320, 70)">
+                    <rect x="0" y="0" width="250" height="150" fill="rgba(255,255,255,0.1)" rx="10"/>
+                    <text x="125" y="30" text-anchor="middle" fill="#F8FAFC" font-size="20" font-weight="bold">📐 面积单位</text>
+
+                    <!-- 3x3 网格 -->
+                    <g transform="translate(50, 50)">
+                        <rect x="0" y="0" width="60" height="60" fill="#3B82F6" fill-opacity="0.5" stroke="#FFFFFF" stroke-width="2"/>
+                        <rect x="60" y="0" width="60" height="60" fill="#3B82F6" fill-opacity="0.5" stroke="#FFFFFF" stroke-width="2"/>
+                        <rect x="120" y="0" width="60" height="60" fill="#3B82F6" fill-opacity="0.5" stroke="#FFFFFF" stroke-width="2"/>
+                        <rect x="0" y="60" width="60" height="60" fill="#3B82F6" fill-opacity="0.5" stroke="#FFFFFF" stroke-width="2"/>
+                        <rect x="60" y="60" width="60" height="60" fill="#3B82F6" fill-opacity="0.5" stroke="#FFFFFF" stroke-width="2"/>
+                        <rect x="120" y="60" width="60" height="60" fill="#3B82F6" fill-opacity="0.5" stroke="#FFFFFF" stroke-width="2"/>
+                        <rect x="0" y="120" width="60" height="60" fill="#3B82F6" fill-opacity="0.5" stroke="#FFFFFF" stroke-width="2"/>
+                        <rect x="60" y="120" width="60" height="60" fill="#3B82F6" fill-opacity="0.5" stroke="#FFFFFF" stroke-width="2"/>
+                        <rect x="120" y="120" width="60" height="60" fill="#3B82F6" fill-opacity="0.5" stroke="#FFFFFF" stroke-width="2"/>
+                    </g>
+                    <text x="125" y="125" text-anchor="middle" fill="#F8FAFC" font-size="16">3 × 3 = 9 cm²</text>
+                </g>
+
+                <!-- 体积立方体 -->
+                <g transform="translate(30, 240)">
+                    <rect x="0" y="0" width="250" height="180" fill="rgba(255,255,255,0.1)" rx="10"/>
+                    <text x="125" y="30" text-anchor="middle" fill="#F8FAFC" font-size="20" font-weight="bold">🧊 体积单位</text>
+
+                    <!-- 立方体堆叠 -->
+                    <g transform="translate(60, 50)">
+                        <!-- 底层 -->
+                        <rect x="0" y="40" width="40" height="40" fill="#10B981" fill-opacity="0.7" stroke="#FFFFFF" stroke-width="2"/>
+                        <rect x="40" y="40" width="40" height="40" fill="#10B981" fill-opacity="0.7" stroke="#FFFFFF" stroke-width="2"/>
+                        <rect x="80" y="40" width="40" height="40" fill="#10B981" fill-opacity="0.7" stroke="#FFFFFF" stroke-width="2"/>
+                        <!-- 中层 -->
+                        <rect x="0" y="0" width="40" height="40" fill="#10B981" fill-opacity="0.7" stroke="#FFFFFF" stroke-width="2"/>
+                        <rect x="40" y="0" width="40" height="40" fill="#10B981" fill-opacity="0.7" stroke="#FFFFFF" stroke-width="2"/>
+                        <rect x="80" y="0" width="40" height="40" fill="#10B981" fill-opacity="0.7" stroke="#FFFFFF" stroke-width="2"/>
+                        <!-- 上层 -->
+                        <rect x="0" y="-40" width="40" height="40" fill="#10B981" fill-opacity="0.7" stroke="#FFFFFF" stroke-width="2"/>
+                        <rect x="40" y="-40" width="40" height="40" fill="#10B981" fill-opacity="0.7" stroke="#FFFFFF" stroke-width="2"/>
+                        <rect x="80" y="-40" width="40" height="40" fill="#10B981" fill-opacity="0.7" stroke="#FFFFFF" stroke-width="2"/>
+                    </g>
+                    <text x="125" y="150" text-anchor="middle" fill="#F8FAFC" font-size="16">3 × 3 × 3 = 27 cm³</text>
+                </g>
+
+                <!-- 单位换算表 -->
+                <g transform="translate(320, 240)">
+                    <rect x="0" y="0" width="250" height="180" fill="rgba(255,255,255,0.1)" rx="10"/>
+                    <text x="125" y="30" text-anchor="middle" fill="#F8FAFC" font-size="20" font-weight="bold">📊 单位换算</text>
+
+                    <text x="20" y="65" fill="#FBBF24" font-size="18">长度:</text>
+                    <text x="20" y="90" fill="#CBD5E1" font-size="16">1 m = 100 cm</text>
+                    <text x="20" y="115" fill="#CBD5E1" font-size="16">1 cm = 10 mm</text>
+
+                    <text x="20" y="145" fill="#FBBF24" font-size="18">面积:</text>
+                    <text x="20" y="170" fill="#CBD5E1" font-size="16">1 m² = 10,000 cm²</text>
+                </g>
+
+                <!-- 提示 -->
+                <g transform="translate(30, 440)">
+                    <rect x="0" y="0" width="540" height="90" fill="rgba(34, 197, 94, 0.2)" rx="10" stroke="#22C55E" stroke-width="2"/>
+                    <text x="270" y="35" text-anchor="middle" fill="#22C55E" font-size="20" font-weight="bold">💡 记忆小技巧</text>
+                    <text x="270" y="65" text-anchor="middle" fill="#F8FAFC" font-size="18">长度是线, 面积是面, 体积是空间</text>
+                </g>
+            </svg>
+        </div>
+    </div>
+
+    <nav class="navbar">
+        <div style="display: flex; align-items: center; gap: 16px;">
+            <button class="btn-kid" onclick="window.location.href='../'">
+                🏠 返回首页
+            </button>
+            <div class="navbar-title">📏 测量与单位</div>
+        </div>
+        <div style="display: flex; gap: 12px;">
+            <button class="btn-kid" onclick="toggleStaticMode()">🖼️ 静态展示</button>
+            <button class="btn-kid" onclick="toggleControls()">🎮 控制</button>
+        </div>
+    </nav>
+
+    <aside class="control-panel" id="controls">
+        <h2 style="font-size: 24px; margin-bottom: 16px;">🎮 测量工具</h2>
+
+        <div class="tab-buttons">
+            <button class="tab-btn active" onclick="switchTab('length')">长度</button>
+            <button class="tab-btn" onclick="switchTab('area')">面积</button>
+            <button class="tab-btn" onclick="switchTab('volume')">体积</button>
+        </div>
+
+        <!-- 长度控制 -->
+        <div id="length-controls">
+            <div style="margin-bottom: 24px;">
+                <label style="display: block; margin-bottom: 8px;">📏 选择参考物体</label>
+                <select id="objectSelect" onchange="updateObject()" class="kid-slider" style="padding: 12px; border-radius: 8px; border: none; background: rgba(255,255,255,0.2); color: white; width: 100%;">
+                    <option value="pin">📌 回形针 (3cm)</option>
+                    <option value="pencil">✏️ 铅笔 (15cm)</option>
+                    <option value="desk">🪑 课桌 (60cm)</option>
+                </select>
+            </div>
+
+            <div class="unit-display">
+                <h3 style="font-size: 18px; margin-bottom: 8px;">单位换算</h3>
+                <div id="lengthConversion" class="conversion-display">
+                    1 厘米 = 10 毫米
+                </div>
+            </div>
+
+            <div class="info-box">
+                <h3 style="font-size: 16px; margin-bottom: 8px;">💡 小知识</h3>
+                <p style="font-size: 14px; line-height: 1.6;">
+                    长度是指物体的长短。常用的长度单位有毫米(mm)、厘米(cm)、分米(dm)、米(m)。
+                </p>
+            </div>
+        </div>
+
+        <!-- 面积控制 -->
+        <div id="area-controls" style="display: none;">
+            <div style="margin-bottom: 24px;">
+                <label style="display: block; margin-bottom: 8px;">📐 长方形长度</label>
+                <input type="range" class="kid-slider" id="rectWidth" min="1" max="10" value="5" oninput="updateArea()">
+                <div style="text-align: center; margin-top: 8px;">长: <span id="widthVal">5</span> cm</div>
+            </div>
+
+            <div style="margin-bottom: 24px;">
+                <label style="display: block; margin-bottom: 8px;">📐 长方形宽度</label>
+                <input type="range" class="kid-slider" id="rectHeight" min="1" max="10" value="3" oninput="updateArea()">
+                <div style="text-align: center; margin-top: 8px;">宽: <span id="heightVal">3</span> cm</div>
+            </div>
+
+            <div class="unit-display">
+                <h3 style="font-size: 18px; margin-bottom: 8px;">面积计算</h3>
+                <div id="areaCalc" class="conversion-display">
+                    5 × 3 = 15 cm²
+                </div>
+            </div>
+
+            <div class="info-box">
+                <h3 style="font-size: 16px; margin-bottom: 8px;">💡 小知识</h3>
+                <p style="font-size: 14px; line-height: 1.6;">
+                    长方形面积 = 长 × 宽。面积单位有平方厘米(cm²)、平方米(m²)等。
+                </p>
+            </div>
+        </div>
+
+        <!-- 体积控制 -->
+        <div id="volume-controls" style="display: none;">
+            <div style="margin-bottom: 24px;">
+                <label style="display: block; margin-bottom: 8px;">🧊 立方体边长</label>
+                <input type="range" class="kid-slider" id="cubeSize" min="1" max="5" value="2" step="0.5" oninput="updateVolume()">
+                <div style="text-align: center; margin-top: 8px;">边长: <span id="sizeVal">2</span> cm</div>
+            </div>
+
+            <div class="unit-display">
+                <h3 style="font-size: 18px; margin-bottom: 8px;">体积计算</h3>
+                <div id="volumeCalc" class="conversion-display">
+                    2 × 2 × 2 = 8 cm³
+                </div>
+                <div style="font-size: 14px; color: rgba(255,255,255,0.6); margin-top: 8px;">
+                    由 <span id="cubeCount">8</span> 个 1cm³ 小立方体组成
+                </div>
+            </div>
+
+            <div class="info-box">
+                <h3 style="font-size: 16px; margin-bottom: 8px;">💡 小知识</h3>
+                <p style="font-size: 14px; line-height: 1.6;">
+                    正方体体积 = 边长 × 边长 × 边长。体积单位有立方厘米(cm³)、立方米(m³)等。
+                </p>
+            </div>
+        </div>
+
+        <button class="btn-kid" onclick="resetScene()" style="width: 100%;">🔄 重置</button>
+    </aside>
+
+    <script>
+        let scene, camera, renderer, currentObject;
+        let currentTab = 'length';
+        let rectMesh, volumeMesh;
+
+        function init() {
+            const container = document.getElementById('canvas-container');
+            scene = new THREE.Scene();
+            camera = new THREE.PerspectiveCamera(60, window.innerWidth / window.innerHeight, 0.1, 1000);
+            camera.position.set(-2.5, 5, 10);
+            camera.lookAt(0, 0, 0);
+            renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
+            renderer.setSize(window.innerWidth, window.innerHeight);
+            container.appendChild(renderer.domElement);
+
+            const ambientLight = new THREE.AmbientLight(0xffffff, 0.6);
+            scene.add(ambientLight);
+            const directionalLight = new THREE.DirectionalLight(0xffffff, 0.8);
+            directionalLight.position.set(10, 20, 10);
+            scene.add(directionalLight);
+
+            createLengthObject();
+            window.addEventListener('resize', onWindowResize);
+            animate();
+        }
+
+        function createLengthObject() {
+            if (currentObject) scene.remove(currentObject);
+            const objectType = document.getElementById('objectSelect').value;
+            let geometry, material, length;
+
+            switch(objectType) {
+                case 'pin':
+                    length = 3;
+                    geometry = new THREE.CylinderGeometry(0.1, 0.1, length, 32);
+                    material = new THREE.MeshStandardMaterial({ color: 0xEF4444 });
+                    break;
+                case 'pencil':
+                    length = 15;
+                    geometry = new THREE.CylinderGeometry(0.3, 0.3, length, 32);
+                    material = new THREE.MeshStandardMaterial({ color: 0xFBBF24 });
+                    break;
+                case 'desk':
+                    length = 60;
+                    geometry = new THREE.BoxGeometry(40, 60, 2);
+                    material = new THREE.MeshStandardMaterial({ color: 9A3412 });
+                    break;
+            }
+
+            currentObject = new THREE.Mesh(geometry, material);
+
+            if (objectType !== 'desk') {
+                currentObject.rotation.z = Math.PI / 2;
+            }
+
+            // 添加标注线
+            const lineGeometry = new THREE.BufferGeometry().setFromPoints([
+                new THREE.Vector3(-length/2 - 1, 0, 0),
+                new THREE.Vector3(length/2 + 1, 0, 0)
+            ]);
+            const line = new THREE.Line(lineGeometry, new THREE.LineBasicMaterial({ color: 0xffffff }));
+            currentObject.add(line);
+
+            scene.add(currentObject);
+            updateLengthConversion();
+        }
+
+        function createRectangle() {
+            if (currentObject) scene.remove(currentObject);
+            const width = parseFloat(document.getElementById('rectWidth').value);
+            const height = parseFloat(document.getElementById('rectHeight').value);
+
+            const geometry = new THREE.PlaneGeometry(width, height);
+            const material = new THREE.MeshStandardMaterial({
+                color: 0x3B82F6,
+                side: THREE.DoubleSide
+            });
+            rectMesh = new THREE.Mesh(geometry, material);
+            rectMesh.rotation.x = -Math.PI / 2;
+
+            // 添加网格
+            const gridHelper = new THREE.GridHelper(Math.max(width, height), Math.max(width, height), 0xffffff, 0x60A5FA);
+            gridHelper.position.y = 0.01;
+            rectMesh.add(gridHelper);
+
+            currentObject = rectMesh;
+            scene.add(currentObject);
+            updateAreaCalc();
+        }
+
+        function createVolume() {
+            if (currentObject) scene.remove(currentObject);
+            const size = parseFloat(document.getElementById('cubeSize').value);
+
+            // 创建大立方体（半透明）
+            const outerGeometry = new THREE.BoxGeometry(size, size, size);
+            const outerMaterial = new THREE.MeshStandardMaterial({
+                color: 0x10B981,
+                transparent: true,
+                opacity: 0.3
+            });
+            volumeMesh = new THREE.Mesh(outerGeometry, outerMaterial);
+
+            // 创建边框
+            const edges = new THREE.EdgesGeometry(outerGeometry);
+            const line = new THREE.LineSegments(edges, new THREE.LineBasicMaterial({ color: 0xffffff }));
+            volumeMesh.add(line);
+
+            // 显示单位立方体数量
+            const count = Math.pow(size, 3);
+            if (count <= 27) { // 只在小立方体数量较少时显示
+                const smallCubeGeometry = new THREE.BoxGeometry(0.9, 0.9, 0.9);
+                const smallCubeMaterial = new THREE.MeshStandardMaterial({
+                    color: 0x34D399,
+                    transparent: true,
+                    opacity: 0.5
+                });
+
+                for (let x = 0; x < size; x++) {
+                    for (let y = 0; y < size; y++) {
+                        for (let z = 0; z < size; z++) {
+                            const smallCube = new THREE.Mesh(smallCubeGeometry, smallCubeMaterial);
+                            smallCube.position.set(
+                                x - size/2 + 0.5,
+                                y - size/2 + 0.5,
+                                z - size/2 + 0.5
+                            );
+                            volumeMesh.add(smallCube);
+                        }
+                    }
+                }
+            }
+
+            currentObject = volumeMesh;
+            scene.add(currentObject);
+            updateVolumeCalc();
+        }
+
+        function updateObject() {
+            createLengthObject();
+        }
+
+        function updateLengthConversion() {
+            const objectType = document.getElementById('objectSelect').value;
+            const conversions = {
+                pin: '1 厘米 = 10 毫米\n回形针约 3 厘米',
+                pencil: '1 米 = 100 厘米\n铅笔约 15 厘米',
+                desk: '1 米 = 100 厘米\n课桌约 60 厘米'
+            };
+            document.getElementById('lengthConversion').innerText = conversions[objectType];
+        }
+
+        function updateArea() {
+            document.getElementById('widthVal').textContent = document.getElementById('rectWidth').value;
+            document.getElementById('heightVal').textContent = document.getElementById('rectHeight').value;
+            createRectangle();
+        }
+
+        function updateAreaCalc() {
+            const width = parseFloat(document.getElementById('rectWidth').value);
+            const height = parseFloat(document.getElementById('rectHeight').value);
+            const area = width * height;
+            document.getElementById('areaCalc').textContent = `${width} × ${height} = ${area} cm²`;
+        }
+
+        function updateVolume() {
+            document.getElementById('sizeVal').textContent = document.getElementById('cubeSize').value;
+            createVolume();
+        }
+
+        function updateVolumeCalc() {
+            const size = parseFloat(document.getElementById('cubeSize').value);
+            const volume = Math.pow(size, 3);
+            const count = Math.pow(size, 3);
+            document.getElementById('volumeCalc').textContent = `${size} × ${size} × ${size} = ${volume} cm³`;
+            document.getElementById('cubeCount').textContent = count;
+        }
+
+        function switchTab(tab) {
+            currentTab = tab;
+
+            // 更新按钮状态
+            document.querySelectorAll('.tab-btn').forEach(btn => btn.classList.remove('active'));
+            event.target.classList.add('active');
+
+            // 隐藏所有控制面板
+            document.getElementById('length-controls').style.display = 'none';
+            document.getElementById('area-controls').style.display = 'none';
+            document.getElementById('volume-controls').style.display = 'none';
+
+            // 显示选中的控制面板
+            document.getElementById(`${tab}-controls`).style.display = 'block';
+
+            // 创建对应的 3D 对象
+            if (tab === 'length') {
+                createLengthObject();
+            } else if (tab === 'area') {
+                createRectangle();
+            } else if (tab === 'volume') {
+                createVolume();
+            }
+        }
+
+        function resetScene() {
+            document.getElementById('objectSelect').value = 'pin';
+            document.getElementById('rectWidth').value = 5;
+            document.getElementById('rectHeight').value = 3;
+            document.getElementById('cubeSize').value = 2;
+            updateLengthConversion();
+            updateAreaCalc();
+            updateVolumeCalc();
+            switchTab(currentTab);
+        }
+
+        function toggleControls() {
+            document.getElementById('controls').classList.toggle('active');
+        }
+
+        let isStaticMode = false;
+        function toggleStaticMode() {
+            isStaticMode = !isStaticMode;
+            const staticContainer = document.getElementById('static-container');
+            const canvasContainer = document.getElementById('canvas-container');
+
+            if (isStaticMode) {
+                staticContainer.classList.add('active');
+                canvasContainer.style.display = 'none';
+            } else {
+                staticContainer.classList.remove('active');
+                canvasContainer.style.display = 'block';
+            }
+        }
+
+        function onWindowResize() {
+            camera.aspect = window.innerWidth / window.innerHeight;
+            camera.updateProjectionMatrix();
+            renderer.setSize(window.innerWidth, window.innerHeight);
+        }
+
+        function animate() {
+            requestAnimationFrame(animate);
+
+            // 为所有tab添加轻微的相机环绕动画，增加视觉吸引力
+            if (currentObject) {
+                if (currentTab === 'volume') {
+                    currentObject.rotation.y += 0.003;
+                } else if (currentTab === 'area') {
+                    // 面积图：轻微上下浮动效果
+                    currentObject.position.y = Math.sin(Date.now() * 0.001) * 0.1 + 0.01;
+                } else if (currentTab === 'length') {
+                    // 长度物体：轻微摆动展示3D效果
+                    currentObject.rotation.y = Math.sin(Date.now() * 0.0005) * 0.1;
+                    currentObject.rotation.z = Math.sin(Date.now() * 0.0003) * 0.05;
+                }
+            }
+
+            renderer.render(scene, camera);
+        }
+
+        document.addEventListener('DOMContentLoaded', init);
+    </script>
+</body>
+</html>

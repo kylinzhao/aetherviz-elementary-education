@@ -1,0 +1,431 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AetherViz 小学教学 - 基础模板</title>
+
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+
+    <!-- KaTeX -->
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.css">
+    <script src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/contrib/auto-render.min.js"></script>
+
+    <!-- Three.js -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r134/three.min.js"></script>
+
+    <!-- D3.js (可选) -->
+    <script src="https://d3js.org/d3.v7.min.js"></script>
+
+    <!-- 无障碍功能模块 -->
+    <script src="../modules/accessibility.js"></script>
+
+    <!-- 儿童主题样式 -->
+    <style>
+        :root {
+            /* 核心渐变 - 从青绿到天蓝 */
+            --primary-gradient: linear-gradient(135deg, #14B8A6 0%, #06B6D4 50%, #22D3EE 100%);
+            --primary-gradient-light: linear-gradient(135deg, #2DD4BF 0%, #5EEAD4 50%, #67E8F9 100%);
+            --primary-gradient-dark: linear-gradient(135deg, #0D9488 0%, #0891B2 50%, #0EA5E9 100%);
+
+            /* 背景渐变 - 深海科技感 */
+            --bg-gradient: linear-gradient(180deg, #0F172A 0%, #164E63 50%, #155E75 100%);
+            --bg-gradient-card: linear-gradient(145deg, rgba(20, 184, 166, 0.15) 0%, rgba(6, 182, 212, 0.1) 100%);
+
+            /* 强调色 - 霓虹质感 */
+            --accent-cyan: #22D3EE;
+            --accent-emerald: #34D399;
+            --accent-amber: #FBBF24;
+            --accent-rose: #FB7185;
+            --accent-orange: #FB923C;
+
+            /* 主题色 - 根据学科自动切换 */
+            --theme-physics: linear-gradient(135deg, #3B82F6 0%, #0EA5E9 100%);
+            --theme-chemistry: linear-gradient(135deg, #F59E0B 0%, #EF4444 100%);
+            --theme-biology: linear-gradient(135deg, #10B981 0%, #22D3EE 100%);
+            --theme-math: linear-gradient(135deg, #F59E0B 0%, #EAB308 100%);
+            --theme-astronomy: linear-gradient(135deg, #1E40AF 0%, #3B82F6 100%);
+            --theme-programming: linear-gradient(135deg, #22C55E 0%, #14B8A6 100%);
+
+            /* 玻璃拟态 */
+            --glass-bg: rgba(255, 255, 255, 0.08);
+            --glass-border: rgba(255, 255, 255, 0.15);
+            --glass-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
+
+            /* 文字颜色 */
+            --text-primary: #F8FAFC;
+            --text-secondary: #CBD5E1;
+            --text-muted: #94A3B8;
+
+            /* 功能色 */
+            --success: #22C55E;
+            --warning: #F59E0B;
+            --error: #EF4444;
+            --info: #3B82F6;
+
+            /* 字体大小 */
+            --font-size-base: 18px;
+            --font-size-large: 24px;
+            --font-size-title: 32px;
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+            background: var(--bg-gradient);
+            color: var(--text-primary);
+            font-size: var(--font-size-base);
+            overflow-x: hidden;
+        }
+
+        /* 3D 画布容器 */
+        #canvas-container {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            z-index: 0;
+        }
+
+        /* 顶部导航栏 */
+        .navbar {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            height: 70px;
+            background: rgba(15, 23, 42, 0.85);
+            backdrop-filter: blur(10px);
+            border-bottom: 2px solid rgba(20, 184, 166, 0.3);
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 0 24px;
+            z-index: 100;
+        }
+
+        .navbar-title {
+            font-size: var(--font-size-title);
+            font-weight: bold;
+            background: var(--primary-gradient);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+
+        /* 侧边栏 */
+        .sidebar {
+            position: fixed;
+            left: 0;
+            top: 70px;
+            width: 30%;
+            height: calc(100vh - 70px);
+            background: rgba(15, 23, 42, 0.9);
+            backdrop-filter: blur(10px);
+            padding: 24px;
+            overflow-y: auto;
+            z-index: 90;
+            transform: translateX(-100%);
+            transition: transform 0.3s ease;
+        }
+
+        .sidebar.active {
+            transform: translateX(0);
+        }
+
+        /* 控制面板 */
+        .control-panel {
+            position: fixed;
+            right: 0;
+            top: 70px;
+            width: 30%;
+            height: calc(100vh - 70px);
+            background: rgba(22, 78, 99, 0.7);
+            backdrop-filter: blur(10px);
+            border-left: 1px solid rgba(20, 184, 166, 0.25);
+            padding: 24px;
+            overflow-y: auto;
+            z-index: 90;
+            transform: translateX(100%);
+            transition: transform 0.3s ease;
+        }
+
+        .control-panel.active {
+            transform: translateX(0);
+        }
+
+        /* 儿童友好按钮 */
+        .btn-kid {
+            min-width: 60px;
+            min-height: 60px;
+            padding: 16px 24px;
+            font-size: 18px;
+            border-radius: 12px;
+            border: none;
+            background: var(--primary-gradient);
+            color: white;
+            cursor: pointer;
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            transition: all 0.3s ease;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+        }
+
+        .btn-kid:hover {
+            transform: scale(1.05);
+            box-shadow: 0 6px 16px rgba(0, 0, 0, 0.3);
+        }
+
+        .btn-kid:active {
+            transform: scale(0.95);
+        }
+
+        /* 儿童友好滑块 */
+        input[type="range"].kid-slider {
+            -webkit-appearance: none;
+            width: 100%;
+            height: 12px;
+            border-radius: 6px;
+            background: rgba(255, 255, 255, 0.2);
+            outline: none;
+            cursor: pointer;
+        }
+
+        input[type="range"].kid-slider::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            width: 32px;
+            height: 32px;
+            border-radius: 50%;
+            background: var(--primary-gradient);
+            cursor: pointer;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
+            transition: all 0.2s ease;
+        }
+
+        input[type="range"].kid-slider::-webkit-slider-thumb:hover {
+            transform: scale(1.1);
+        }
+
+        /* 呼吸动画 */
+        @keyframes breathe {
+            0%, 100% { transform: scale(1); }
+            50% { transform: scale(1.05); }
+        }
+
+        .breathe {
+            animation: breathe 2s ease-in-out infinite;
+        }
+
+        /* 响应式 */
+        @media (max-width: 640px) {
+            .sidebar, .control-panel {
+                width: 100%;
+                max-height: 40vh;
+            }
+        }
+
+        @media (min-width: 641px) and (max-width: 1024px) {
+            .sidebar, .control-panel {
+                width: 35%;
+                max-height: 80vh;
+            }
+        }
+
+        @media (min-width: 1025px) {
+            .sidebar, .control-panel {
+                width: 30%;
+            }
+        }
+    </style>
+</head>
+<body>
+    <!-- 跳过导航链接 -->
+    <div id="skip-links">
+        <a href="#main-content" class="skip-link">跳到主内容</a>
+        <a href="#sidebar" class="skip-link">跳到学习目标</a>
+        <a href="#controls" class="skip-link">跳到控制面板</a>
+    </div>
+
+    <!-- 3D 画布容器 -->
+    <div id="canvas-container" aria-hidden="true"></div>
+
+    <!-- 顶部导航栏 -->
+    <nav class="navbar" role="navigation" aria-label="主导航">
+        <div class="navbar-title">AetherViz 小学教学</div>
+        <div class="navbar-buttons" role="group" aria-label="导航按钮">
+            <button class="btn-kid" onclick="toggleSidebar()" aria-label="打开学习目标面板" aria-expanded="false" aria-controls="sidebar">
+                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
+                    <line x1="3" y1="12" x2="21" y2="12"></line>
+                    <line x1="3" y1="6" x2="21" y2="6"></line>
+                    <line x1="3" y1="18" x2="21" y2="18"></line>
+                </svg>
+                学习目标
+            </button>
+            <button class="btn-kid" onclick="toggleControls()" aria-label="打开控制面板" aria-expanded="false" aria-controls="controls">
+                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
+                    <circle cx="12" cy="12" r="3"></circle>
+                    <path d="M12 1v6m0 6v6M4.22 4.22l4.24 4.24m5.08 5.08l4.24 4.24M1 12h6m6 0h6M4.22 19.78l4.24-4.24m5.08-5.08l4.24-4.24"></path>
+                </svg>
+                控制
+            </button>
+            <button class="btn-kid" onclick="toggleAccessibility()" aria-label="打开无障碍设置" aria-expanded="false" aria-controls="a11y-panel">
+                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
+                    <circle cx="12" cy="12" r="3"></circle>
+                    <path d="M12 1v6m0 6v6M4.22 4.22l4.24 4.24m5.08 5.08l4.24 4.24M1 12h6m6 0h6M4.22 19.78l4.24-4.24m5.08-5.08l4.24-4.24"></path>
+                </svg>
+                无障碍
+            </button>
+        </div>
+    </nav>
+
+    <!-- 主内容区域 -->
+    <main id="main-content" role="main" tabindex="-1">
+        <!-- 页面内容将在这里 -->
+    </main>
+
+    <!-- 侧边栏 -->
+    <aside class="sidebar" id="sidebar" role="complementary" aria-label="学习目标">
+        <h2 style="font-size: var(--font-size-large); margin-bottom: 16px;">学习目标</h2>
+        <ul style="list-style: none;" role="list">
+            <li style="margin-bottom: 12px;">
+                <input type="checkbox" id="obj1" style="width: 20px; height: 20px;" aria-label="理解基本概念">
+                <label for="obj1" style="margin-left: 8px;">理解基本概念</label>
+            </li>
+            <li style="margin-bottom: 12px;">
+                <input type="checkbox" id="obj2" style="width: 20px; height: 20px;" aria-label="观察3D可视化">
+                <label for="obj2" style="margin-left: 8px;">观察3D可视化</label>
+            </li>
+            <li style="margin-bottom: 12px;">
+                <input type="checkbox" id="obj3" style="width: 20px; height: 20px;" aria-label="完成互动练习">
+                <label for="obj3" style="margin-left: 8px;">完成互动练习</label>
+            </li>
+        </ul>
+    </aside>
+
+    <!-- 控制面板 -->
+    <aside class="control-panel" id="controls" role="region" aria-label="参数控制">
+        <h2 style="font-size: var(--font-size-large); margin-bottom: 16px;">参数控制</h2>
+        <div style="margin-bottom: 24px;" role="group" aria-label="参数1控制">
+            <label for="param1-slider" style="display: block; margin-bottom: 8px;">参数 1</label>
+            <input type="range" id="param1-slider" class="kid-slider" min="0" max="100" value="50"
+                   oninput="updateParam1(this.value)"
+                   aria-label="参数1滑块" aria-valuemin="0" aria-valuemax="100" aria-valuenow="50">
+            <div style="text-align: center; margin-top: 8px;" aria-live="polite">值: <span id="param1-value">50</span></div>
+        </div>
+        <div style="margin-bottom: 24px;" role="group" aria-label="参数2控制">
+            <label for="param2-slider" style="display: block; margin-bottom: 8px;">参数 2</label>
+            <input type="range" id="param2-slider" class="kid-slider" min="0" max="100" value="50"
+                   oninput="updateParam2(this.value)"
+                   aria-label="参数2滑块" aria-valuemin="0" aria-valuemax="100" aria-valuenow="50">
+            <div style="text-align: center; margin-top: 8px;" aria-live="polite">值: <span id="param2-value">50</span></div>
+        </div>
+        <button class="btn-kid" onclick="resetScene()" style="width: 100%;" aria-label="重置场景到初始状态">
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
+                <path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"></path>
+                <path d="M3 3v5h5"></path>
+            </svg>
+            重置场景
+        </button>
+    </aside>
+
+    <script>
+        // 切换侧边栏
+        function toggleSidebar() {
+            const sidebar = document.getElementById('sidebar');
+            const isActive = sidebar.classList.toggle('active');
+
+            // 更新按钮状态
+            const btn = document.querySelector('button[aria-controls="sidebar"]');
+            if (btn) {
+                btn.setAttribute('aria-expanded', isActive);
+            }
+
+            // 公告给屏幕阅读器
+            window.A11y.announce(isActive ? '学习目标面板已打开' : '学习目标面板已关闭');
+        }
+
+        // 切换控制面板
+        function toggleControls() {
+            const controls = document.getElementById('controls');
+            const isActive = controls.classList.toggle('active');
+
+            // 更新按钮状态
+            const btn = document.querySelector('button[aria-controls="controls"]');
+            if (btn) {
+                btn.setAttribute('aria-expanded', isActive);
+            }
+
+            // 公告给屏幕阅读器
+            window.A11y.announce(isActive ? '控制面板已打开' : '控制面板已关闭');
+        }
+
+        // 切换无障碍设置面板
+        function toggleAccessibility() {
+            let panel = document.getElementById('a11y-panel');
+
+            // 首次调用时创建面板
+            if (!panel) {
+                panel = window.A11y.createAccessibilityPanel();
+                document.body.appendChild(panel);
+            }
+
+            const isActive = panel.classList.toggle('active');
+
+            // 更新按钮状态
+            const btn = document.querySelector('button[aria-controls="a11y-panel"]');
+            if (btn) {
+                btn.setAttribute('aria-expanded', isActive);
+            }
+
+            // 公告给屏幕阅读器
+            window.A11y.announce(isActive ? '无障碍设置已打开' : '无障碍设置已关闭');
+        }
+
+        // 更新参数
+        function updateParam1(value) {
+            document.getElementById('param1-value').textContent = value;
+            const slider = document.getElementById('param1-slider');
+            slider.setAttribute('aria-valuenow', value);
+        }
+
+        function updateParam2(value) {
+            document.getElementById('param2-value').textContent = value;
+            const slider = document.getElementById('param2-slider');
+            slider.setAttribute('aria-valuenow', value);
+        }
+
+        // 重置场景
+        function resetScene() {
+            if (confirm('确定要重置场景吗？')) {
+                // 重置逻辑
+                console.log('场景已重置');
+                window.A11y.announce('场景已重置');
+            }
+        }
+
+        // 渲染数学公式
+        document.addEventListener("DOMContentLoaded", function() {
+            renderMathInElement(document.body, {
+                delimiters: [
+                    {left: "$$", right: "$$", display: true},
+                    {left: "$", right: "$", display: false}
+                ]
+            });
+
+            // 初始化无障碍功能
+            if (window.A11y) {
+                window.A11y.addAriaLabels();
+            }
+        });
+    </script>
+</body>
+</html>

@@ -1,0 +1,516 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>斜面模型 - AetherViz 小学教学</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r134/three.min.js"></script>
+    <style>
+        :root {
+            --primary-gradient: linear-gradient(135deg, #F59E0B 0%, #DC2626 100%);
+            --bg-gradient: linear-gradient(180deg, #0F172A 0%, #7C2D12 50%, #991B1B 100%);
+        }
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: 'Inter', sans-serif;
+            background: var(--bg-gradient);
+            color: #F8FAFC;
+            font-size: 18px;
+            overflow-x: hidden;
+        }
+        #canvas-container { position: fixed; top: 0; left: 0; width: 100%; height: 100%; z-index: 0; }
+
+        #static-container {
+            position: fixed;
+            top: 70px;
+            left: 0;
+            width: 100%;
+            height: calc(100vh - 70px);
+            display: none;
+            justify-content: center;
+            align-items: center;
+            z-index: 1;
+            background: var(--bg-gradient);
+        }
+
+        #static-container.active {
+            display: flex;
+        }
+
+        .static-diagram {
+            max-width: 90%;
+            max-height: 90%;
+            background: rgba(255, 255, 255, 0.05);
+            border-radius: 20px;
+            padding: 40px;
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+        }
+        .navbar {
+            position: fixed; top: 0; left: 0; right: 0; height: 70px;
+            background: rgba(15, 23, 42, 0.85); backdrop-filter: blur(10px);
+            border-bottom: 2px solid rgba(245, 158, 11, 0.3);
+            display: flex; align-items: center; justify-content: space-between;
+            padding: 0 24px; z-index: 100;
+        }
+        .navbar-title { font-size: 32px; font-weight: bold; background: var(--primary-gradient); -webkit-background-clip: text; -webkit-text-fill-color: transparent; }
+        .btn-kid {
+            min-width: 60px; min-height: 60px; padding: 16px 24px;
+            font-size: 18px; border-radius: 12px; border: none;
+            background: var(--primary-gradient); color: white;
+            cursor: pointer; transition: all 0.3s ease;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+        }
+        .btn-kid:hover { transform: scale(1.05); }
+        .control-panel {
+            position: fixed; right: 0; top: 70px; width: 30%;
+            height: calc(100vh - 70px); background: rgba(124, 45, 18, 0.7);
+            backdrop-filter: blur(10px); border-left: 1px solid rgba(245, 158, 11, 0.25);
+            padding: 24px; overflow-y: auto; z-index: 90;
+        }
+        input[type="range"].kid-slider {
+            -webkit-appearance: none; width: 100%; height: 12px;
+            border-radius: 6px; background: rgba(255, 255, 255, 0.2);
+            cursor: pointer;
+        }
+        input[type="range"].kid-slider::-webkit-slider-thumb {
+            -webkit-appearance: none; width: 32px; height: 32px;
+            border-radius: 50%; background: var(--primary-gradient); cursor: pointer;
+        }
+        .info-box {
+            padding: 16px; background: rgba(255,255,255,0.05);
+            border-radius: 12px; margin-top: 16px;
+        }
+        .force-display {
+            display: flex; justify-content: space-around;
+            padding: 16px; background: rgba(255, 255, 255, 0.05);
+            border-radius: 12px; margin: 16px 0;
+        }
+        .force-item {
+            text-align: center;
+        }
+        .force-value {
+            font-size: 28px; font-weight: bold;
+            background: var(--primary-gradient);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+
+        /* 移动端优化 */
+        @media (max-width: 640px) {
+            .navbar {
+                padding: 0 12px;
+                height: 56px;
+            }
+            .navbar-title {
+                font-size: 20px;
+            }
+            .btn-kid {
+                min-width: 44px;
+                min-height: 44px;
+                padding: 10px 12px;
+                font-size: 14px;
+            }
+            .control-panel {
+                width: 100%;
+                height: 50vh;
+                top: 56px;
+            }
+            body {
+                font-size: 16px;
+            }
+            .force-value {
+                font-size: 24px;
+            }
+        }
+
+        /* 平板端优化 */
+        @media (min-width: 641px) and (max-width: 1024px) {
+            .control-panel {
+                width: 40%;
+            }
+            .navbar-title {
+                font-size: 26px;
+            }
+        }
+
+        /* 触摸设备优化 */
+        @media (hover: none) and (pointer: coarse) {
+            input[type="range"].kid-slider::-webkit-slider-thumb {
+                width: 40px;
+                height: 40px;
+            }
+            .btn-kid {
+                min-height: 48px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div id="canvas-container"></div>
+
+    <!-- 静态展示容器 -->
+    <div id="static-container">
+        <div class="static-diagram">
+            <svg width="700" height="550" viewBox="0 0 700 550">
+                <!-- 标题 -->
+                <text x="350" y="40" text-anchor="middle" fill="#F8FAFC" font-size="28" font-weight="bold">
+                    斜面原理 - 省力示意图
+                </text>
+
+                <!-- 主图 -->
+                <g transform="translate(100, 100)">
+                    <!-- 地面 -->
+                    <rect x="0" y="300" width="500" height="10" fill="#8B4513" rx="2"/>
+
+                    <!-- 斜面三角形 -->
+                    <polygon points="50,300 450,300 450,100" fill="rgba(156, 163, 184, 0.3)" stroke="#9CA3AF" stroke-width="3"/>
+
+                    <!-- 斜面顶边 -->
+                    <line x1="50" y1="300" x2="450" y2="100" stroke="#F59E0B" stroke-width="4"/>
+
+                    <!-- 物体 -->
+                    <rect x="220" y="155" width="60" height="40" fill="#3B82F6" stroke="#FFFFFF" stroke-width="2" rx="3" transform="rotate(-24 250 175)"/>
+
+                    <!-- 角度标注 -->
+                    <path d="M 100 300 A 50 50 0 0 1 95 275" stroke="#FBBF24" stroke-width="2" fill="none"/>
+                    <text x="130" y="295" fill="#FBBF24" font-size="18" font-weight="bold">15°</text>
+
+                    <!-- 高度标注 -->
+                    <line x1="450" y1="300" x2="480" y2="300" stroke="#FFFFFF" stroke-width="2"/>
+                    <line x1="450" y1="100" x2="480" y2="100" stroke="#FFFFFF" stroke-width="2"/>
+                    <line x1="475" y1="300" x2="475" y2="100" stroke="#EF4444" stroke-width="3" stroke-dasharray="5,5"/>
+                    <text x="490" y="205" fill="#EF4444" font-size="16" font-weight="bold">高度 h</text>
+
+                    <!-- 底边标注 -->
+                    <line x1="50" y1="320" x2="450" y2="320" stroke="#FFFFFF" stroke-width="2"/>
+                    <line x1="50" y1="310" x2="50" y2="330" stroke="#FFFFFF" stroke-width="2"/>
+                    <line x1="450" y1="310" x2="450" y2="330" stroke="#FFFFFF" stroke-width="2"/>
+                    <text x="250" y="340" text-anchor="middle" fill="#FFFFFF" font-size="16" font-weight="bold">底边长度 L</text>
+
+                    <!-- 重力箭头（垂直向下） -->
+                    <line x1="250" y1="195" x2="250" y2="280" stroke="#EF4444" stroke-width="4"/>
+                    <polygon points="250,285 243,270 257,270" fill="#EF4444"/>
+                    <text x="260" y="260" fill="#EF4444" font-size="18" font-weight="bold">G = mg</text>
+
+                    <!-- 拉力箭头（沿斜面向上） -->
+                    <line x1="280" y1="175" x2="340" y2="150" stroke="#10B981" stroke-width="4"/>
+                    <polygon points="345,147 330,158 338,145" fill="#10B981"/>
+                    <text x="355" y="155" fill="#10B981" font-size="18" font-weight="bold">F拉</text>
+                </g>
+
+                <!-- 省力说明 -->
+                <g transform="translate(100, 430)">
+                    <rect x="0" y="0" width="500" height="110" fill="rgba(255,255,255,0.08)" rx="10"/>
+                    <text x="250" y="30" text-anchor="middle" fill="#F8FAFC" font-size="20" font-weight="bold">💡 省力原理</text>
+
+                    <text x="30" y="55" fill="#CBD5E1" font-size="16">
+                        垂直提升力：
+                    </text>
+                    <text x="150" y="55" fill="#EF4444" font-size="16" font-weight="bold">
+                        F垂直 = G = mg = 50N
+                    </text>
+
+                    <text x="30" y="80" fill="#CBD5E1" font-size="16">
+                        斜面拉力：
+                    </text>
+                    <text x="130" y="80" fill="#10B981" font-size="16" font-weight="bold">
+                        F拉 = G × sin(15°) ≈ 13N
+                    </text>
+
+                    <text x="400" y="68" fill="#FBBF24" font-size="18" font-weight="bold">
+                        省力 3.8 倍！
+                    </text>
+                </g>
+            </svg>
+        </div>
+    </div>
+
+    <nav class="navbar">
+        <div style="display: flex; align-items: center; gap: 16px;">
+            <button class="btn-kid" onclick="window.location.href='../'">
+                🏠 返回首页
+            </button>
+            <div class="navbar-title">📐 斜面模型</div>
+        </div>
+        <div style="display: flex; gap: 12px;">
+            <button class="btn-kid" onclick="toggleStaticMode()">
+                🖼️ 静态展示
+            </button>
+            <button class="btn-kid" onclick="toggleControls()">🎮 控制</button>
+        </div>
+    </nav>
+
+    <aside class="control-panel" id="controls">
+        <h2 style="font-size: 24px; margin-bottom: 16px;">📐 斜面参数</h2>
+
+        <div style="margin-bottom: 24px;">
+            <label style="display: block; margin-bottom: 8px;">📐 斜面角度 (度)</label>
+            <input type="range" class="kid-slider" id="inclineAngle" min="5" max="45" value="15" step="1" oninput="updateIncline()">
+            <div style="text-align: center; margin-top: 8px;">
+                <span id="angleValue">15</span>°
+            </div>
+        </div>
+
+        <div style="margin-bottom: 24px;">
+            <label style="display: block; margin-bottom: 8px;">🏋️ 物体重量 (kg)</label>
+            <input type="range" class="kid-slider" id="boxWeight" min="1" max="10" value="5" oninput="updateIncline()">
+            <div style="text-align: center; margin-top: 8px;">
+                重量: <span id="weightValue">5</span> kg
+            </div>
+        </div>
+
+        <div class="force-display">
+            <div class="force-item">
+                <div style="font-size: 14px; color: rgba(255,255,255,0.6);">垂直提升</div>
+                <div class="force-value"><span id="liftForce">50</span>N</div>
+            </div>
+            <div class="force-item">
+                <div style="font-size: 14px; color: rgba(255,255,255,0.6);">斜面拉力</div>
+                <div class="force-value"><span id="pullForce">13</span>N</div>
+            </div>
+            <div class="force-item">
+                <div style="font-size: 14px; color: rgba(255,255,255,0.6);">省力倍数</div>
+                <div class="force-value"><span id="saving">3.8</span>x</div>
+            </div>
+        </div>
+
+        <div class="info-box">
+            <h3 style="font-size: 18px; margin-bottom: 8px;">💡 斜面原理</h3>
+            <p style="font-size: 14px; line-height: 1.6; margin-bottom: 12px;">
+                斜面是一种简单机械，可以省力。斜面越平缓（角度越小），越省力，但需要移动的距离越长。
+            </p>
+            <p style="font-size: 14px; line-height: 1.6;">
+                <strong>公式：</strong><br>
+                拉力 = 重量 × sin(角度)
+            </p>
+        </div>
+
+        <div class="info-box">
+            <h3 style="font-size: 16px; margin-bottom: 8px;">🏠 生活中的应用</h3>
+            <ul style="font-size: 14px; line-height: 1.8; margin-left: 20px;">
+                <li>盘山公路</li>
+                <li>轮椅斜坡</li>
+                <li>扶梯</li>
+                <li>螺丝钉</li>
+            </ul>
+        </div>
+
+        <button class="btn-kid" onclick="resetScene()" style="width: 100%;">🔄 重置</button>
+    </aside>
+
+    <script>
+        let scene, camera, renderer, inclineSystem;
+        let angle = 15;
+        let weight = 5;
+
+        function init() {
+            const container = document.getElementById('canvas-container');
+            scene = new THREE.Scene();
+            camera = new THREE.PerspectiveCamera(60, window.innerWidth / window.innerHeight, 0.1, 1000);
+            camera.position.set(-3, 5, 12);
+            camera.lookAt(0, 1, 0);
+            renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
+            renderer.setSize(window.innerWidth, window.innerHeight);
+            container.appendChild(renderer.domElement);
+
+            const ambientLight = new THREE.AmbientLight(0xffffff, 0.6);
+            scene.add(ambientLight);
+            const directionalLight = new THREE.DirectionalLight(0xffffff, 0.8);
+            directionalLight.position.set(10, 20, 10);
+            scene.add(directionalLight);
+
+            createIncline();
+            window.addEventListener('resize', onWindowResize);
+            animate();
+        }
+
+        function createIncline() {
+            if (inclineSystem) scene.remove(inclineSystem);
+            inclineSystem = new THREE.Group();
+
+            const angleRad = angle * Math.PI / 180;
+            const inclineLength = 8;
+            const inclineHeight = Math.sin(angleRad) * inclineLength;
+            const inclineWidth = 3;
+
+            // 地面
+            const groundGeometry = new THREE.BoxGeometry(15, 0.2, 8);
+            const groundMaterial = new THREE.MeshStandardMaterial({ color: 0x8B4513 });
+            const ground = new THREE.Mesh(groundGeometry, groundMaterial);
+            ground.position.y = -0.1;
+            inclineSystem.add(ground);
+
+            // 斜面
+            const inclineGeometry = new THREE.BoxGeometry(inclineLength, 0.3, inclineWidth);
+            const inclineMaterial = new THREE.MeshStandardMaterial({ color: 0x9CA3AF });
+            const incline = new THREE.Mesh(inclineGeometry, inclineMaterial);
+            incline.position.set(
+                inclineLength / 2 - inclineHeight / Math.tan(angleRad),
+                inclineHeight / 2,
+                0
+            );
+            incline.rotation.z = angleRad;
+            inclineSystem.add(incline);
+
+            // 斜面支撑
+            const supportGeometry = new THREE.BoxGeometry(
+                inclineHeight / Math.tan(angleRad),
+                inclineHeight,
+                0.2
+            );
+            const supportMaterial = new THREE.MeshStandardMaterial({ color: 0x6B7280 });
+            const support = new THREE.Mesh(supportGeometry, supportMaterial);
+            support.position.set(
+                (inclineLength / 2 - inclineHeight / Math.tan(angleRad)) / 2,
+                inclineHeight / 2,
+                inclineWidth / 2 + 0.2
+            );
+            support.rotation.z = -Math.PI / 2;
+            inclineSystem.add(support);
+
+            // 物体（盒子）
+            const boxGeometry = new THREE.BoxGeometry(1, weight * 0.2, 1);
+            const boxMaterial = new THREE.MeshStandardMaterial({ color: 0x3B82F6 });
+            const box = new THREE.Mesh(boxGeometry, boxMaterial);
+
+            // 计算物体在斜面上的位置
+            const boxPosition = 2; // 距离斜面底部的距离
+            box.position.set(
+                boxPosition * Math.cos(angleRad) - inclineHeight / Math.tan(angleRad),
+                boxPosition * Math.sin(angleRad) + 0.15 + weight * 0.1,
+                0
+            );
+            box.rotation.z = angleRad;
+            inclineSystem.add(box);
+
+            // 重力箭头（垂直向下）
+            const gravityForce = weight * 10; // g ≈ 10 N/kg
+            createForceArrow(
+                box.position.x,
+                box.position.y + weight * 0.15,
+                box.position.z,
+                0, -1, 0,
+                gravityForce * 0.1,
+                0xEF4444
+            );
+
+            // 拉力箭头（沿斜面向上）
+            const pullForce = gravityForce * Math.sin(angleRad);
+            createForceArrow(
+                box.position.x,
+                box.position.y + weight * 0.15,
+                box.position.z,
+                Math.cos(angleRad), Math.sin(angleRad), 0,
+                pullForce * 0.1,
+                0x10B981
+            );
+
+            // 角度标注
+            createAngleIndicator(angleRad, inclineLength);
+
+            scene.add(inclineSystem);
+            updateForces();
+        }
+
+        function createForceArrow(x, y, z, dirX, dirY, dirZ, length, color) {
+            const dir = new THREE.Vector3(dirX, dirY, dirZ).normalize();
+            const origin = new THREE.Vector3(x, y, z);
+            const arrowHelper = new THREE.ArrowHelper(dir, origin, length, color, 0.4, 0.3);
+            inclineSystem.add(arrowHelper);
+        }
+
+        function createAngleIndicator(angleRad, length) {
+            const curve = new THREE.EllipseCurve(
+                0, 0,
+                1.5, 1.5,
+                0, angleRad,
+                false,
+                0
+            );
+
+            const points = curve.getPoints(32);
+            const geometry = new THREE.BufferGeometry().setFromPoints(points);
+            const material = new THREE.LineBasicMaterial({ color: 0xFBBF24, linewidth: 2 });
+
+            // 调整曲线位置和旋转
+            const ellipse = new THREE.Line(geometry, material);
+            ellipse.rotation.x = angleRad - Math.PI / 2;
+            ellipse.position.set(
+                -length * Math.sin(angleRad * 0.1),
+                0,
+                0
+            );
+            inclineSystem.add(ellipse);
+        }
+
+        function updateIncline() {
+            angle = parseInt(document.getElementById('inclineAngle').value);
+            weight = parseInt(document.getElementById('boxWeight').value);
+
+            document.getElementById('angleValue').textContent = angle;
+            document.getElementById('weightValue').textContent = weight;
+
+            createIncline();
+        }
+
+        function updateForces() {
+            const gravityForce = weight * 10;
+            const pullForce = gravityForce * Math.sin(angle * Math.PI / 180);
+            const saving = gravityForce / pullForce;
+
+            document.getElementById('liftForce').textContent = Math.round(gravityForce);
+            document.getElementById('pullForce').textContent = Math.round(pullForce);
+            document.getElementById('saving').textContent = saving.toFixed(1);
+        }
+
+        function resetScene() {
+            document.getElementById('inclineAngle').value = 15;
+            document.getElementById('boxWeight').value = 5;
+            angle = 15;
+            weight = 5;
+            updateIncline();
+        }
+
+        function toggleControls() {
+            document.getElementById('controls').classList.toggle('active');
+        }
+
+        let isStaticMode = false;
+
+        function toggleStaticMode() {
+            isStaticMode = !isStaticMode;
+            const staticContainer = document.getElementById('static-container');
+            const canvasContainer = document.getElementById('canvas-container');
+
+            if (isStaticMode) {
+                staticContainer.classList.add('active');
+                canvasContainer.style.display = 'none';
+            } else {
+                staticContainer.classList.remove('active');
+                canvasContainer.style.display = 'block';
+            }
+        }
+
+        function onWindowResize() {
+            camera.aspect = window.innerWidth / window.innerHeight;
+            camera.updateProjectionMatrix();
+            renderer.setSize(window.innerWidth, window.innerHeight);
+        }
+
+        function animate() {
+            requestAnimationFrame(animate);
+
+            // 轻微的呼吸效果
+            if (inclineSystem) {
+                const time = Date.now() * 0.001;
+                inclineSystem.position.y = Math.sin(time) * 0.01;
+            }
+
+            renderer.render(scene, camera);
+        }
+
+        document.addEventListener('DOMContentLoaded', init);
+    </script>
+</body>
+</html>

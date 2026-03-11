@@ -1,0 +1,520 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>杠杆原理 - AetherViz 小学教学</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r134/three.min.js"></script>
+    <style>
+        :root {
+            --primary-gradient: linear-gradient(135deg, #10B981 0%, #22D3EE 100%);
+            --bg-gradient: linear-gradient(180deg, #0F172A 0%, #064E3B 50%, #047857 100%);
+        }
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: 'Inter', sans-serif;
+            background: var(--bg-gradient);
+            color: #F8FAFC;
+            font-size: 18px;
+            overflow-x: hidden;
+        }
+        #canvas-container { position: fixed; top: 0; left: 0; width: 100%; height: 100%; z-index: 0; }
+        #static-container {
+            position: fixed;
+            top: 70px;
+            left: 0;
+            width: 100%;
+            height: calc(100vh - 70px);
+            display: none;
+            justify-content: center;
+            align-items: center;
+            z-index: 1;
+            background: var(--bg-gradient);
+        }
+        #static-container.active {
+            display: flex;
+        }
+        .static-diagram {
+            max-width: 90%;
+            max-height: 90%;
+            background: rgba(255, 255, 255, 0.05);
+            border-radius: 20px;
+            padding: 40px;
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+        }
+        .navbar {
+            position: fixed; top: 0; left: 0; right: 0; height: 70px;
+            background: rgba(15, 23, 42, 0.85); backdrop-filter: blur(10px);
+            border-bottom: 2px solid rgba(16, 185, 129, 0.3);
+            display: flex; align-items: center; justify-content: space-between;
+            padding: 0 24px; z-index: 100;
+        }
+        .navbar-title { font-size: 32px; font-weight: bold; background: var(--primary-gradient); -webkit-background-clip: text; -webkit-text-fill-color: transparent; }
+        .btn-kid {
+            min-width: 60px; min-height: 60px; padding: 16px 24px;
+            font-size: 18px; border-radius: 12px; border: none;
+            background: var(--primary-gradient); color: white;
+            cursor: pointer; transition: all 0.3s ease;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+        }
+        .btn-kid:hover { transform: scale(1.05); }
+        .control-panel {
+            position: fixed; right: 0; top: 70px; width: 30%;
+            height: calc(100vh - 70px); background: rgba(6, 78, 59, 0.7);
+            backdrop-filter: blur(10px); border-left: 1px solid rgba(16, 185, 129, 0.25);
+            padding: 24px; overflow-y: auto; z-index: 90;
+        }
+        input[type="range"].kid-slider {
+            -webkit-appearance: none; width: 100%; height: 12px;
+            border-radius: 6px; background: rgba(255, 255, 255, 0.2);
+            cursor: pointer;
+        }
+        input[type="range"].kid-slider::-webkit-slider-thumb {
+            -webkit-appearance: none; width: 32px; height: 32px;
+            border-radius: 50%; background: var(--primary-gradient); cursor: pointer;
+        }
+        .balance-indicator {
+            text-align: center; padding: 16px;
+            background: rgba(255, 255, 255, 0.05);
+            border-radius: 12px; margin: 16px 0;
+        }
+
+        /* 移动端优化 */
+        @media (max-width: 640px) {
+            .navbar {
+                padding: 0 12px;
+                height: 56px;
+            }
+            .navbar-title {
+                font-size: 20px;
+            }
+            .btn-kid {
+                min-width: 44px;
+                min-height: 44px;
+                padding: 10px 12px;
+                font-size: 14px;
+            }
+            .control-panel {
+                width: 100%;
+                height: 50vh;
+                top: 56px;
+            }
+            body {
+                font-size: 16px;
+            }
+        }
+
+        /* 平板端优化 */
+        @media (min-width: 641px) and (max-width: 1024px) {
+            .control-panel {
+                width: 40%;
+            }
+            .navbar-title {
+                font-size: 26px;
+            }
+        }
+
+        /* 触摸设备优化 */
+        @media (hover: none) and (pointer: coarse) {
+            input[type="range"].kid-slider::-webkit-slider-thumb {
+                width: 40px;
+                height: 40px;
+            }
+            .btn-kid {
+                min-height: 48px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div id="canvas-container"></div>
+
+    <!-- 静态展示容器 -->
+    <div id="static-container">
+        <div class="static-diagram">
+            <svg width="600" height="550" viewBox="0 0 600 550">
+                <!-- 标题 -->
+                <text x="300" y="40" text-anchor="middle" fill="#F8FAFC" font-size="28" font-weight="bold">
+                    杠杆原理
+                </text>
+
+                <!-- 平衡状态 -->
+                <g transform="translate(30, 70)">
+                    <rect x="0" y="0" width="540" height="180" fill="rgba(255,255,255,0.1)" rx="10"/>
+                    <text x="270" y="30" text-anchor="middle" fill="#22C55E" font-size="20" font-weight="bold">⚖️ 平衡状态</text>
+
+                    <!-- 支座 -->
+                    <polygon points="270,80 290,130 250,130" fill="#8B5CF6" stroke="#FFFFFF" stroke-width="2"/>
+                    <circle cx="270" cy="80" r="8" fill="#FBBF24" stroke="#FFFFFF" stroke-width="2"/>
+                    <text x="270" y="150" text-anchor="middle" fill="#F8FAFC" font-size="16">支点</text>
+
+                    <!-- 杠杆臂（水平） -->
+                    <rect x="100" y="75" width="340" height="10" fill="#F59E0B" stroke="#FFFFFF" stroke-width="2"/>
+
+                    <!-- 左侧物体 -->
+                    <rect x="130" y="45" width="40" height="30" fill="#3B82F6" stroke="#FFFFFF" stroke-width="2"/>
+                    <text x="150" y="65" text-anchor="middle" fill="#FFFFFF" font-size="14" font-weight="bold">5kg</text>
+                    <text x="150" y="40" text-anchor="middle" fill="#3B82F6" font-size="16" font-weight="bold">动力</text>
+
+                    <!-- 右侧物体 -->
+                    <rect x="430" y="45" width="40" height="30" fill="#10B981" stroke="#FFFFFF" stroke-width="2"/>
+                    <text x="450" y="65" text-anchor="middle" fill="#FFFFFF" font-size="14" font-weight="bold">5kg</text>
+                    <text x="450" y="40" text-anchor="middle" fill="#10B981" font-size="16" font-weight="bold">阻力</text>
+
+                    <!-- 距离标注 -->
+                    <line x1="150" y1="90" x2="270" y2="90" stroke="#FBBF24" stroke-width="2" stroke-dasharray="5,5"/>
+                    <line x1="270" y1="90" x2="450" y2="90" stroke="#FBBF24" stroke-width="2" stroke-dasharray="5,5"/>
+                    <text x="210" y="105" text-anchor="middle" fill="#FBBF24" font-size="12">动力臂</text>
+                    <text x="360" y="105" text-anchor="middle" fill="#FBBF24" font-size="12">阻力臂</text>
+
+                    <!-- 平衡公式 -->
+                    <text x="270" y="170" text-anchor="middle" fill="#22C55E" font-size="18" font-weight="bold">5 × 3 = 5 × 3 ✓</text>
+                </g>
+
+                <!-- 不平衡状态 - 左沉 -->
+                <g transform="translate(30, 270)">
+                    <rect x="0" y="0" width="260" height="160" fill="rgba(239, 68, 68, 0.15)" rx="10"/>
+                    <text x="130" y="25" text-anchor="middle" fill="#EF4444" font-size="18" font-weight="bold">⬅️ 左边重</text>
+
+                    <!-- 支座 -->
+                    <polygon points="130,60 145,90 115,90" fill="#8B5CF6" stroke="#FFFFFF" stroke-width="2"/>
+
+                    <!-- 杠杆臂（倾斜） -->
+                    <rect x="40" y="55" width="180" height="8" fill="#F59E0B" stroke="#FFFFFF" stroke-width="2" transform="rotate(-15, 130, 59)"/>
+
+                    <!-- 左侧物体 -->
+                    <rect x="55" y="30" width="30" height="25" fill="#3B82F6" stroke="#FFFFFF" stroke-width="2"/>
+                    <text x="70" y="47" text-anchor="middle" fill="#FFFFFF" font-size="12" font-weight="bold">8kg</text>
+
+                    <!-- 右侧物体 -->
+                    <rect x="175" y="70" width="30" height="25" fill="#10B981" stroke="#FFFFFF" stroke-width="2"/>
+                    <text x="190" y="87" text-anchor="middle" fill="#FFFFFF" font-size="12" font-weight="bold">3kg</text>
+
+                    <text x="130" y="140" text-anchor="middle" fill="#EF4444" font-size="14">8 × 3 > 3 × 3</text>
+                </g>
+
+                <!-- 不平衡状态 - 右沉 -->
+                <g transform="translate(310, 270)">
+                    <rect x="0" y="0" width="260" height="160" fill="rgba(239, 68, 68, 0.15)" rx="10"/>
+                    <text x="130" y="25" text-anchor="middle" fill="#EF4444" font-size="18" font-weight="bold">➡️ 右边重</text>
+
+                    <!-- 支座 -->
+                    <polygon points="130,60 145,90 115,90" fill="#8B5CF6" stroke="#FFFFFF" stroke-width="2"/>
+
+                    <!-- 杠杆臂（倾斜） -->
+                    <rect x="40" y="55" width="180" height="8" fill="#F59E0B" stroke="#FFFFFF" stroke-width="2" transform="rotate(15, 130, 59)"/>
+
+                    <!-- 左侧物体 -->
+                    <rect x="55" y="70" width="30" height="25" fill="#3B82F6" stroke="#FFFFFF" stroke-width="2"/>
+                    <text x="70" y="87" text-anchor="middle" fill="#FFFFFF" font-size="12" font-weight="bold">3kg</text>
+
+                    <!-- 右侧物体 -->
+                    <rect x="175" y="30" width="30" height="25" fill="#10B981" stroke="#FFFFFF" stroke-width="2"/>
+                    <text x="190" y="47" text-anchor="middle" fill="#FFFFFF" font-size="12" font-weight="bold">8kg</text>
+
+                    <text x="130" y="140" text-anchor="middle" fill="#EF4444" font-size="14">3 × 3 < 8 × 3</text>
+                </g>
+
+                <!-- 核心原理说明 -->
+                <g transform="translate(30, 450)">
+                    <rect x="0" y="0" width="540" height="80" fill="rgba(245, 158, 11, 0.2)" rx="10" stroke="#F59E0B" stroke-width="2"/>
+                    <text x="270" y="30" text-anchor="middle" fill="#FBBF24" font-size="20" font-weight="bold">💡 杠杆平衡公式</text>
+                    <text x="270" y="60" text-anchor="middle" fill="#F8FAFC" font-size="22" font-weight="bold">动力 × 动力臂 = 阻力 × 阻力臂</text>
+                </g>
+            </svg>
+        </div>
+    </div>
+
+    <nav class="navbar">
+        <div style="display: flex; align-items: center; gap: 16px;">
+            <button class="btn-kid" onclick="window.location.href='../'">
+                🏠 返回首页
+            </button>
+            <div class="navbar-title">🔬 杠杆原理</div>
+        </div>
+        <div style="display: flex; gap: 12px;">
+            <button class="btn-kid" onclick="toggleStaticMode()">🖼️ 静态展示</button>
+            <button class="btn-kid" onclick="toggleControls()">🎮 控制</button>
+        </div>
+    </nav>
+
+    <aside class="control-panel" id="controls">
+        <h2 style="font-size: 24px; margin-bottom: 16px;">🎮 参数控制</h2>
+
+        <div style="margin-bottom: 24px;">
+            <label style="display: block; margin-bottom: 8px;">⚖️ 左侧重量</label>
+            <input type="range" class="kid-slider" id="leftWeight" min="1" max="10" value="5" oninput="updateLever()">
+            <div style="text-align: center; margin-top: 8px;">重量: <span id="leftVal">5</span> kg</div>
+        </div>
+
+        <div style="margin-bottom: 24px;">
+            <label style="display: block; margin-bottom: 8px;">⚖️ 右侧重量</label>
+            <input type="range" class="kid-slider" id="rightWeight" min="1" max="10" value="5" oninput="updateLever()">
+            <div style="text-align: center; margin-top: 8px;">重量: <span id="rightVal">5</span> kg</div>
+        </div>
+
+        <div style="margin-bottom: 24px;">
+            <label style="display: block; margin-bottom: 8px;">📍 支点位置</label>
+            <input type="range" class="kid-slider" id="fulcrumPos" min="-4" max="4" value="0" step="0.5" oninput="updateLever()">
+            <div style="text-align: center; margin-top: 8px;">位置: <span id="fulcrumVal">0</span></div>
+        </div>
+
+        <div class="balance-indicator">
+            <h3 style="font-size: 18px; margin-bottom: 8px;">⚖️ 平衡状态</h3>
+            <div id="balanceStatus" style="font-size: 24px; font-weight: bold;">⚖️ 平衡</div>
+            <div id="balanceCalc" style="font-size: 14px; color: rgba(255,255,255,0.6); margin-top: 8px;"></div>
+        </div>
+
+        <div style="padding: 16px; background: rgba(255,255,255,0.05); border-radius: 12px;">
+            <h3 style="font-size: 16px; margin-bottom: 8px;">💡 小知识</h3>
+            <p style="font-size: 14px; line-height: 1.6;">
+                杠杆平衡公式：左边重量 × 左边距离 = 右边重量 × 右边距离
+            </p>
+        </div>
+
+        <button class="btn-kid" onclick="resetScene()" style="width: 100%;">🔄 重置</button>
+    </aside>
+
+    <script>
+        let scene, camera, renderer, lever, fulcrum, leftWeight, rightWeight;
+        let leftW = 5, rightW = 5, fulcrumX = 0;
+        let raycaster, mouse;
+        let isDragging = false;
+        let dragObject = null;
+        let targetTilt = 0;
+        let currentTilt = 0;
+
+        function init() {
+            const container = document.getElementById('canvas-container');
+            scene = new THREE.Scene();
+            camera = new THREE.PerspectiveCamera(60, window.innerWidth / window.innerHeight, 0.1, 1000);
+            camera.position.set(-2.5, 8, 12);
+            camera.lookAt(0, 0, 0);
+            renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
+            renderer.setSize(window.innerWidth, window.innerHeight);
+            container.appendChild(renderer.domElement);
+
+            raycaster = new THREE.Raycaster();
+            mouse = new THREE.Vector2();
+
+            const ambientLight = new THREE.AmbientLight(0xffffff, 0.6);
+            scene.add(ambientLight);
+            const directionalLight = new THREE.DirectionalLight(0xffffff, 0.8);
+            directionalLight.position.set(10, 20, 10);
+            scene.add(directionalLight);
+
+            createLever();
+
+            // 添加鼠标交互
+            renderer.domElement.addEventListener('mousedown', onMouseDown);
+            renderer.domElement.addEventListener('mousemove', onMouseMove);
+            renderer.domElement.addEventListener('mouseup', onMouseUp);
+
+            window.addEventListener('resize', onWindowResize);
+            animate();
+        }
+
+        function onMouseDown(event) {
+            mouse.x = (event.clientX / window.innerWidth) * 2 - 1;
+            mouse.y = -(event.clientY / window.innerHeight) * 2 + 1;
+
+            raycaster.setFromCamera(mouse, camera);
+            const intersects = raycaster.intersectObjects([fulcrum], true);
+
+            if (intersects.length > 0) {
+                isDragging = true;
+                dragObject = fulcrum;
+                renderer.domElement.style.cursor = 'grabbing';
+            }
+        }
+
+        function onMouseMove(event) {
+            if (!isDragging || dragObject !== fulcrum) return;
+
+            mouse.x = (event.clientX / window.innerWidth) * 2 - 1;
+            mouse.y = -(event.clientY / window.innerHeight) * 2 + 1;
+
+            raycaster.setFromCamera(mouse, camera);
+            const plane = new THREE.Plane(new THREE.Vector3(0, 1, 0), 0);
+            const intersectPoint = new THREE.Vector3();
+            raycaster.ray.intersectPlane(plane, intersectPoint);
+
+            // 限制支点移动范围
+            fulcrumX = Math.max(-4, Math.min(4, intersectPoint.x));
+            document.getElementById('fulcrumPos').value = fulcrumX;
+            document.getElementById('fulcrumVal').textContent = fulcrumX.toFixed(1);
+
+            updateLever();
+        }
+
+        function onMouseUp() {
+            isDragging = false;
+            dragObject = null;
+            renderer.domElement.style.cursor = 'grab';
+        }
+
+        function createLever() {
+            if (lever) scene.remove(lever);
+            lever = new THREE.Group();
+
+            // 支座
+            const fulcrumGeometry = new THREE.ConeGeometry(0.5, 1, 4);
+            const fulcrumMaterial = new THREE.MeshStandardMaterial({ color: 0x8B5CF6 });
+            fulcrum = new THREE.Mesh(fulcrumGeometry, fulcrumMaterial);
+            fulcrum.position.set(fulcrumX, 0.5, 0);
+            fulcrum.rotation.y = Math.PI / 4;
+            lever.add(fulcrum);
+
+            // 杠杆臂
+            const armGeometry = new THREE.BoxGeometry(10, 0.2, 0.5);
+            const armMaterial = new THREE.MeshStandardMaterial({ color: 0xF59E0B });
+            const arm = new THREE.Mesh(armGeometry, armMaterial);
+            arm.position.set(fulcrumX, 1.1, 0);
+            lever.add(arm);
+
+            // 左侧物体
+            const lwGeometry = new THREE.BoxGeometry(1, 1, 1);
+            const lwMaterial = new THREE.MeshStandardMaterial({ color: 0x3B82F6 });
+            leftWeight = new THREE.Mesh(lwGeometry, lwMaterial);
+            leftWeight.position.set(fulcrumX - 3, 1.6, 0);
+            leftWeight.scale.setScalar(0.5 + leftW * 0.1);
+            lever.add(leftWeight);
+
+            // 右侧物体
+            const rwGeometry = new THREE.BoxGeometry(1, 1, 1);
+            const rwMaterial = new THREE.MeshStandardMaterial({ color: 0x10B981 });
+            rightWeight = new THREE.Mesh(rwGeometry, rwMaterial);
+            rightWeight.position.set(fulcrumX + 3, 1.6, 0);
+            rightWeight.scale.setScalar(0.5 + rightW * 0.1);
+            lever.add(rightWeight);
+
+            // 力箭头
+            createForceArrow(fulcrumX - 3, 2.5, 0xEF4444);
+            createForceArrow(fulcrumX + 3, 2.5, 0x22C55E);
+
+            scene.add(lever);
+            updateBalance();
+        }
+
+        function createForceArrow(x, y, color) {
+            const dir = new THREE.Vector3(0, -1, 0);
+            const origin = new THREE.Vector3(x, y, 0);
+            const arrowHelper = new THREE.ArrowHelper(dir, origin, 1, color, 0.3, 0.2);
+            lever.add(arrowHelper);
+        }
+
+        function updateLever() {
+            leftW = parseInt(document.getElementById('leftWeight').value);
+            rightW = parseInt(document.getElementById('rightWeight').value);
+            fulcrumX = parseFloat(document.getElementById('fulcrumPos').value);
+
+            document.getElementById('leftVal').textContent = leftW;
+            document.getElementById('rightVal').textContent = rightW;
+            document.getElementById('fulcrumVal').textContent = fulcrumX;
+
+            createLever();
+        }
+
+        function updateBalance() {
+            const leftDist = 3;
+            const rightDist = 3;
+            const leftTorque = leftW * leftDist;
+            const rightTorque = rightW * rightDist;
+
+            const status = document.getElementById('balanceStatus');
+            const calc = document.getElementById('balanceCalc');
+
+            calc.textContent = `左边力矩: ${leftTorque.toFixed(1)} | 右边力矩: ${rightTorque.toFixed(1)}`;
+
+            const torqueDiff = leftTorque - rightTorque;
+            const maxTilt = 0.3; // 最大倾斜角度（弧度）
+
+            if (Math.abs(torqueDiff) < 0.1) {
+                status.textContent = '⚖️ 平衡';
+                status.style.color = '#22C55E';
+                targetTilt = 0;
+            } else if (torqueDiff > 0) {
+                status.textContent = '⬅️ 左沉';
+                status.style.color = '#EF4444';
+                // 根据力矩差计算倾斜角度
+                targetTilt = -Math.min(maxTilt, torqueDiff * 0.05);
+            } else {
+                status.textContent = '➡️ 右沉';
+                status.style.color = '#EF4444';
+                targetTilt = Math.min(maxTilt, Math.abs(torqueDiff) * 0.05);
+            }
+        }
+
+        function resetScene() {
+            leftW = 5;
+            rightW = 5;
+            fulcrumX = 0;
+            document.getElementById('leftWeight').value = 5;
+            document.getElementById('rightWeight').value = 5;
+            document.getElementById('fulcrumPos').value = 0;
+            updateLever();
+        }
+
+        function toggleControls() {
+            document.getElementById('controls').classList.toggle('active');
+        }
+
+        let isStaticMode = false;
+        function toggleStaticMode() {
+            isStaticMode = !isStaticMode;
+            const staticContainer = document.getElementById('static-container');
+            const canvasContainer = document.getElementById('canvas-container');
+
+            if (isStaticMode) {
+                staticContainer.classList.add('active');
+                canvasContainer.style.display = 'none';
+            } else {
+                staticContainer.classList.remove('active');
+                canvasContainer.style.display = 'block';
+            }
+        }
+
+        function onWindowResize() {
+            camera.aspect = window.innerWidth / window.innerHeight;
+            camera.updateProjectionMatrix();
+            renderer.setSize(window.innerWidth, window.innerHeight);
+        }
+
+        function animate() {
+            requestAnimationFrame(animate);
+
+            // 为杠杆添加微小的"呼吸"效果
+            if (lever) {
+                const time = Date.now() * 0.001;
+                lever.position.y = Math.sin(time) * 0.01;
+
+                // 平滑过渡到目标倾斜角度
+                currentTilt += (targetTilt - currentTilt) * 0.05;
+
+                // 应用倾斜到杠杆臂和物体
+                if (lever.children[1]) { // 杠杆臂
+                    lever.children[1].rotation.z = currentTilt;
+                }
+                if (leftWeight) {
+                    leftWeight.rotation.z = currentTilt;
+                    // 根据倾斜调整位置
+                    const tiltOffset = Math.sin(currentTilt) * 0.5;
+                    leftWeight.position.y = 1.6 - tiltOffset;
+                    leftWeight.position.x = fulcrumX - 3 + Math.cos(currentTilt) * 0.1;
+                }
+                if (rightWeight) {
+                    rightWeight.rotation.z = currentTilt;
+                    const tiltOffset = Math.sin(currentTilt) * 0.5;
+                    rightWeight.position.y = 1.6 + tiltOffset;
+                    rightWeight.position.x = fulcrumX + 3 - Math.cos(currentTilt) * 0.1;
+                }
+            }
+
+            renderer.render(scene, camera);
+        }
+
+        document.addEventListener('DOMContentLoaded', init);
+    </script>
+</body>
+</html>

@@ -1,0 +1,690 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>认识正方形 - AetherViz 小学教学</title>
+
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+
+    <!-- Three.js -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r134/three.min.js"></script>
+
+    <!-- KaTeX -->
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.css">
+    <script src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/contrib/auto-render.min.js"></script>
+
+    <style>
+        :root {
+            --primary-gradient: linear-gradient(135deg, #F59E0B 0%, #EAB308 100%);
+            --bg-gradient: linear-gradient(180deg, #0F172A 0%, #164E63 50%, #155E75 100%);
+            --glass-bg: rgba(255, 255, 255, 0.08);
+            --glass-border: rgba(255, 255, 255, 0.15);
+            --text-primary: #F8FAFC;
+            --text-secondary: #CBD5E1;
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Inter', -apple-system, sans-serif;
+            background: var(--bg-gradient);
+            color: var(--text-primary);
+            font-size: 18px;
+            overflow-x: hidden;
+        }
+
+        #canvas-container {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            z-index: 0;
+        }
+
+        #static-container {
+            position: fixed;
+            top: 70px;
+            left: 0;
+            width: 100%;
+            height: calc(100vh - 70px);
+            display: none;
+            justify-content: center;
+            align-items: center;
+            z-index: 1;
+            background: var(--bg-gradient);
+        }
+
+        #static-container.active {
+            display: flex;
+        }
+
+        .static-diagram {
+            max-width: 90%;
+            max-height: 90%;
+            background: rgba(255, 255, 255, 0.05);
+            border-radius: 20px;
+            padding: 40px;
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+        }
+
+        .navbar {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            height: 70px;
+            background: rgba(15, 23, 42, 0.85);
+            backdrop-filter: blur(10px);
+            border-bottom: 2px solid rgba(245, 158, 11, 0.3);
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 0 24px;
+            z-index: 100;
+        }
+
+        .navbar-title {
+            font-size: 32px;
+            font-weight: bold;
+            background: var(--primary-gradient);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+
+        .btn-kid {
+            min-width: 60px;
+            min-height: 60px;
+            padding: 16px 24px;
+            font-size: 18px;
+            border-radius: 12px;
+            border: none;
+            background: var(--primary-gradient);
+            color: white;
+            cursor: pointer;
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            transition: all 0.3s ease;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+        }
+
+        .btn-kid:hover {
+            transform: scale(1.05);
+        }
+
+        .sidebar {
+            position: fixed;
+            left: 0;
+            top: 70px;
+            width: 30%;
+            height: calc(100vh - 70px);
+            background: rgba(15, 23, 42, 0.9);
+            backdrop-filter: blur(10px);
+            padding: 24px;
+            overflow-y: auto;
+            z-index: 90;
+            transform: translateX(-100%);
+            transition: transform 0.3s ease;
+        }
+
+        .sidebar.active {
+            transform: translateX(0);
+        }
+
+        .control-panel {
+            position: fixed;
+            right: 0;
+            top: 70px;
+            width: 30%;
+            height: calc(100vh - 70px);
+            background: rgba(22, 78, 99, 0.7);
+            backdrop-filter: blur(10px);
+            border-left: 1px solid rgba(245, 158, 11, 0.25);
+            padding: 24px;
+            overflow-y: auto;
+            z-index: 90;
+            transform: translateX(100%);
+            transition: transform 0.3s ease;
+        }
+
+        .control-panel.active {
+            transform: translateX(0);
+        }
+
+        input[type="range"].kid-slider {
+            -webkit-appearance: none;
+            width: 100%;
+            height: 12px;
+            border-radius: 6px;
+            background: rgba(255, 255, 255, 0.2);
+            outline: none;
+            cursor: pointer;
+        }
+
+        input[type="range"].kid-slider::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            width: 32px;
+            height: 32px;
+            border-radius: 50%;
+            background: var(--primary-gradient);
+            cursor: pointer;
+        }
+
+        @keyframes celebrate {
+            0%, 100% { transform: scale(1); opacity: 0; }
+            50% { transform: scale(1.2); opacity: 1; }
+        }
+
+        /* 移动端优化 */
+        @media (max-width: 640px) {
+            .navbar {
+                padding: 0 12px;
+                height: 56px;
+            }
+            .navbar-title {
+                font-size: 20px;
+            }
+            .btn-kid {
+                min-width: 44px;
+                min-height: 44px;
+                padding: 10px 12px;
+                font-size: 14px;
+            }
+            .btn-kid span {
+                display: none;
+            }
+            .sidebar, .control-panel {
+                width: 100%;
+                height: 50vh;
+                top: 56px;
+            }
+            body {
+                font-size: 16px;
+            }
+        }
+
+        /* 平板端优化 */
+        @media (min-width: 641px) and (max-width: 1024px) {
+            .control-panel {
+                width: 40%;
+            }
+            .navbar-title {
+                font-size: 26px;
+            }
+        }
+
+        /* 触摸设备优化 */
+        @media (hover: none) and (pointer: coarse) {
+            input[type="range"].kid-slider::-webkit-slider-thumb {
+                width: 40px;
+                height: 40px;
+            }
+            .btn-kid {
+                min-height: 48px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <!-- 3D 画布 -->
+    <div id="canvas-container"></div>
+
+    <!-- 任务侧边栏容器 -->
+    <div id="task-container"></div>
+
+    <!-- 静态展示容器 -->
+    <div id="static-container">
+        <div class="static-diagram">
+            <svg width="500" height="600" viewBox="0 0 500 600">
+                <!-- 标题 -->
+                <text x="250" y="35" text-anchor="middle" fill="#F8FAFC" font-size="28" font-weight="bold">
+                    平面与立体图形
+                </text>
+
+                <!-- 正方形部分 -->
+                <g transform="translate(25, 60)">
+                    <text x="100" y="0" text-anchor="middle" fill="#F8FAFC" font-size="20" font-weight="bold">
+                        ⬜ 正方形（平面）
+                    </text>
+
+                    <!-- 正方形主体 -->
+                    <rect x="25" y="20" width="150" height="150" fill="#F59E0B" stroke="#FFFFFF" stroke-width="3" rx="3"/>
+
+                    <!-- 边标注 -->
+                    <text x="100" y="15" text-anchor="middle" fill="#F8FAFC" font-size="14">边长</text>
+                    <line x1="25" y1="10" x2="175" y2="10" stroke="#F8FAFC" stroke-width="2"/>
+                    <line x1="25" y1="5" x2="25" y2="15" stroke="#F8FAFC" stroke-width="2"/>
+                    <line x1="175" y1="5" x2="175" y2="15" stroke="#F8FAFC" stroke-width="2"/>
+
+                    <!-- 直角标注 -->
+                    <circle cx="25" cy="20" r="15" fill="none" stroke="#22C55E" stroke-width="2"/>
+                    <text x="8" y="28" fill="#22C55E" font-size="14" font-weight="bold">90°</text>
+
+                    <circle cx="175" cy="20" r="15" fill="none" stroke="#22C55E" stroke-width="2"/>
+                    <text x="182" y="28" fill="#22C55E" font-size="14" font-weight="bold">90°</text>
+
+                    <circle cx="25" cy="170" r="15" fill="none" stroke="#22C55E" stroke-width="2"/>
+                    <text x="8" y="178" fill="#22C55E" font-size="14" font-weight="bold">90°</text>
+
+                    <circle cx="175" cy="170" r="15" fill="none" stroke="#22C55E" stroke-width="2"/>
+                    <text x="182" y="178" fill="#22C55E" font-size="14" font-weight="bold">90°</text>
+                </g>
+
+                <!-- 正方体部分 -->
+                <g transform="translate(275, 60)">
+                    <text x="100" y="0" text-anchor="middle" fill="#F8FAFC" font-size="20" font-weight="bold">
+                        📦 正方体（立体）
+                    </text>
+
+                    <!-- 正方体 - 前面 -->
+                    <rect x="25" y="20" width="120" height="120" fill="#F59E0B" stroke="#FFFFFF" stroke-width="3" rx="2"/>
+
+                    <!-- 正方体 - 顶面 -->
+                    <polygon points="25,20 70,-10 190,-10 145,20" fill="#FBBF24" stroke="#FFFFFF" stroke-width="3"/>
+
+                    <!-- 正方体 - 右面 -->
+                    <polygon points="145,20 190,-10 190,110 145,140" fill="#D97706" stroke="#FFFFFF" stroke-width="3"/>
+
+                    <!-- 顶面标注 -->
+                    <text x="120" y="-25" text-anchor="middle" fill="#F8FAFC" font-size="14">6个面，全部相等</text>
+                    <text x="120" y="-5" text-anchor="middle" fill="#F8FAFC" font-size="12">12条棱，长度相等</text>
+                    <text x="120" y="160" text-anchor="middle" fill="#F8FAFC" font-size="12">8个顶点</text>
+                </g>
+
+                <!-- 特征对比 -->
+                <g transform="translate(25, 270)">
+                    <rect x="0" y="0" width="450" height="140" fill="rgba(255,255,255,0.08)" rx="10"/>
+
+                    <text x="225" y="30" text-anchor="middle" fill="#F8FAFC" font-size="20" font-weight="bold">
+                        特征对比
+                    </text>
+
+                    <!-- 正方形特征 -->
+                    <text x="20" y="60" fill="#CBD5E1" font-size="16" font-weight="bold">
+                        ⬜ 正方形：
+                    </text>
+                    <text x="30" y="85" fill="#CBD5E1" font-size="15">
+                        • 2D 平面图形
+                    </text>
+                    <text x="30" y="108" fill="#CBD5E1" font-size="15">
+                        • 4 条边，4 个角
+                    </text>
+                    <text x="30" y="131" fill="#CBD5E1" font-size="15">
+                        • 有面积，无体积
+                    </text>
+
+                    <!-- 正方体特征 -->
+                    <text x="240" y="60" fill="#CBD5E1" font-size="16" font-weight="bold">
+                        📦 正方体：
+                    </text>
+                    <text x="250" y="85" fill="#CBD5E1" font-size="15">
+                        • 3D 立体图形
+                    </text>
+                    <text x="250" y="108" fill="#CBD5E1" font-size="15">
+                        • 6 个面，12 条棱，8 个顶点
+                    </text>
+                    <text x="250" y="131" fill="#CBD5E1" font-size="15">
+                        • 有面积，也有体积
+                    </text>
+                </g>
+
+                <!-- 生活实例 -->
+                <g transform="translate(25, 430)">
+                    <rect x="0" y="0" width="450" height="100" fill="rgba(255,255,255,0.08)" rx="10"/>
+
+                    <text x="225" y="30" text-anchor="middle" fill="#F8FAFC" font-size="18" font-weight="bold">
+                        💡 生活中的例子
+                    </text>
+
+                    <text x="30" y="60" fill="#CBD5E1" font-size="15">
+                        正方形：🖼️ 相框、🪟 窗户、🎁 礼品盒封面
+                    </text>
+
+                    <text x="30" y="85" fill="#CBD5E1" font-size="15">
+                        正方体：🧊 冰块、🎲 骰子、📦 礼品盒、🧱 粉笔盒
+                    </text>
+                </g>
+            </svg>
+        </div>
+    </div>
+
+    <!-- 导航栏 -->
+    <nav class="navbar">
+        <div style="display: flex; align-items: center; gap: 16px;">
+            <button class="btn-kid" onclick="window.location.href='../'">
+                🏠 返回首页
+            </button>
+            <div class="navbar-title">🔢 认识正方形</div>
+        </div>
+        <div style="display: flex; gap: 12px;">
+            <button class="btn-kid" onclick="toggleStaticMode()">
+                🖼️ 静态展示
+            </button>
+            <button class="btn-kid" onclick="toggleTaskSidebar()">
+                📋 探索任务
+            </button>
+            <button class="btn-kid" onclick="toggleSidebar()">
+                📚 学习目标
+            </button>
+            <button class="btn-kid" onclick="toggleControls()">
+                🎮 控制
+            </button>
+        </div>
+    </nav>
+
+    <!-- 侧边栏 -->
+    <aside class="sidebar" id="sidebar">
+        <h2 style="font-size: 24px; margin-bottom: 16px;">📚 学习目标</h2>
+        <ul style="list-style: none; line-height: 2;">
+            <li>
+                <input type="checkbox" id="obj1" style="width: 20px; height: 20px;">
+                <label for="obj1" style="margin-left: 8px;">认识正方形的形状</label>
+            </li>
+            <li>
+                <input type="checkbox" id="obj2" style="width: 20px; height: 20px;">
+                <label for="obj2" style="margin-left: 8px;">知道正方形有4条边</label>
+            </li>
+            <li>
+                <input type="checkbox" id="obj3" style="width: 20px; height: 20px;">
+                <label for="obj3" style="margin-left: 8px;">知道正方形有4个角</label>
+            </li>
+            <li>
+                <input type="checkbox" id="obj4" style="width: 20px; height: 20px;">
+                <label for="obj4" style="margin-left: 8px;">理解4条边都相等</label>
+            </li>
+        </ul>
+
+        <h3 style="font-size: 20px; margin: 24px 0 12px;">💡 小知识</h3>
+        <p style="color: var(--text-secondary); line-height: 1.6;">
+            正方形是一种特殊的四边形，它的四条边长度都相等，四个角都是直角。
+        </p>
+
+        <h3 style="font-size: 20px; margin: 24px 0 12px;">🎯 生活中的正方形</h3>
+        <ul style="color: var(--text-secondary); line-height: 1.8;">
+            <li>🖼️ 相框</li>
+            <li>🪟 窗户</li>
+            <li>🎁 礼品盒</li>
+            <li>🧱 瓷砖</li>
+        </ul>
+    </aside>
+
+    <!-- 控制面板 -->
+    <aside class="control-panel" id="controls">
+        <h2 style="font-size: 24px; margin-bottom: 16px;">🎮 参数控制</h2>
+
+        <div style="margin-bottom: 24px;">
+            <label style="display: block; margin-bottom: 8px;">📐 图形类型</label>
+            <div style="display: flex; gap: 8px;">
+                <button class="btn-kid" onclick="switchShape('square')" id="btnSquare" style="flex: 1; background: var(--primary-gradient);">
+                    ⬜ 正方形
+                </button>
+                <button class="btn-kid" onclick="switchShape('cube')" id="btnCube" style="flex: 1; background: rgba(255,255,255,0.1);">
+                    📦 正方体
+                </button>
+            </div>
+        </div>
+
+        <div style="margin-bottom: 24px;">
+            <label style="display: block; margin-bottom: 8px;">🔄 旋转速度</label>
+            <input type="range" class="kid-slider" min="0" max="100" value="30" id="rotationSpeed">
+            <div style="text-align: center; margin-top: 8px;">速度: <span id="speedValue">30</span>%</div>
+        </div>
+
+        <div style="margin-bottom: 24px;">
+            <label style="display: block; margin-bottom: 8px;">📏 大小</label>
+            <input type="range" class="kid-slider" min="50" max="200" value="100" id="scale">
+            <div style="text-align: center; margin-top: 8px;">大小: <span id="scaleValue">100</span>%</div>
+        </div>
+
+        <div style="margin-bottom: 24px;">
+            <label style="display: block; margin-bottom: 8px;">🎨 颜色</label>
+            <div style="display: flex; gap: 12px;">
+                <button class="btn-kid" onclick="changeColor(0x3B82F6)" style="background: #3B82F6;">蓝</button>
+                <button class="btn-kid" onclick="changeColor(0x10B981)" style="background: #10B981;">绿</button>
+                <button class="btn-kid" onclick="changeColor(0xF59E0B)" style="background: #F59E0B;">橙</button>
+            </div>
+        </div>
+
+        <button class="btn-kid" onclick="resetScene()" style="width: 100%;">
+            🔄 重置场景
+        </button>
+
+        <div style="margin-top: 24px; padding: 16px; background: rgba(255,255,255,0.05); border-radius: 12px;">
+            <h3 style="font-size: 18px; margin-bottom: 12px;">❓ 问答测试</h3>
+            <div id="quiz-container"></div>
+        </div>
+    </aside>
+
+    <!-- 加载问答和任务系统模块 -->
+    <script src="../modules/quiz-system.js"></script>
+    <script src="../modules/task-system.js"></script>
+
+    <script>
+        // Three.js 变量
+        let scene, camera, renderer, currentShape;
+        let rotationSpeed = 0.01;
+        let scale = 1;
+        let currentShapeType = 'square';
+
+        // 初始化
+        function init() {
+            const container = document.getElementById('canvas-container');
+
+            // 创建场景
+            scene = new THREE.Scene();
+
+            // 创建相机
+            camera = new THREE.PerspectiveCamera(60, window.innerWidth / window.innerHeight, 0.1, 1000);
+            // 向左偏移相机以在剩余空间居中（控制面板占30%右侧）
+            camera.position.set(-2.5, 3, 8);
+            camera.lookAt(0, 0, 0);
+
+            // 创建渲染器
+            renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
+            renderer.setSize(window.innerWidth, window.innerHeight);
+            renderer.setPixelRatio(window.devicePixelRatio);
+            container.appendChild(renderer.domElement);
+
+            // 添加灯光
+            const ambientLight = new THREE.AmbientLight(0xffffff, 0.6);
+            scene.add(ambientLight);
+
+            const directionalLight = new THREE.DirectionalLight(0xffffff, 0.8);
+            directionalLight.position.set(10, 20, 10);
+            scene.add(directionalLight);
+
+            // 创建正方形（默认）
+            createSquare();
+
+            // 添加事件监听
+            window.addEventListener('resize', onWindowResize);
+
+            // 开始动画
+            animate();
+        }
+
+        function createSquare() {
+            if (currentShape) scene.remove(currentShape);
+
+            const geometry = new THREE.PlaneGeometry(3, 3);
+            const material = new THREE.MeshStandardMaterial({
+                color: 0xF59E0B,
+                side: THREE.DoubleSide
+            });
+            currentShape = new THREE.Mesh(geometry, material);
+            scene.add(currentShape);
+
+            // 添加边框
+            const edges = new THREE.EdgesGeometry(geometry);
+            const line = new THREE.LineSegments(edges, new THREE.LineBasicMaterial({ color: 0xffffff, linewidth: 3 }));
+            currentShape.add(line);
+        }
+
+        function createCube() {
+            if (currentShape) scene.remove(currentShape);
+
+            const geometry = new THREE.BoxGeometry(2.5, 2.5, 2.5);
+            const material = new THREE.MeshStandardMaterial({
+                color: 0xF59E0B,
+                transparent: true,
+                opacity: 0.9
+            });
+            currentShape = new THREE.Mesh(geometry, material);
+            scene.add(currentShape);
+
+            // 添加边框
+            const edges = new THREE.EdgesGeometry(geometry);
+            const line = new THREE.LineSegments(edges, new THREE.LineBasicMaterial({ color: 0xffffff, linewidth: 3 }));
+            currentShape.add(line);
+        }
+
+        function switchShape(type) {
+            currentShapeType = type;
+
+            // 更新按钮样式
+            const btnSquare = document.getElementById('btnSquare');
+            const btnCube = document.getElementById('btnCube');
+
+            if (type === 'square') {
+                btnSquare.style.background = 'var(--primary-gradient)';
+                btnCube.style.background = 'rgba(255,255,255,0.1)';
+                createSquare();
+            } else {
+                btnSquare.style.background = 'rgba(255,255,255,0.1)';
+                btnCube.style.background = 'var(--primary-gradient)';
+                createCube();
+            }
+        }
+
+        function animate() {
+            requestAnimationFrame(animate);
+
+            if (currentShape) {
+                if (currentShapeType === 'square') {
+                    currentShape.rotation.y += rotationSpeed;
+                } else {
+                    // 正方体多轴旋转，更好展示3D效果
+                    currentShape.rotation.x += rotationSpeed * 0.5;
+                    currentShape.rotation.y += rotationSpeed;
+                }
+            }
+
+            renderer.render(scene, camera);
+        }
+
+        function onWindowResize() {
+            camera.aspect = window.innerWidth / window.innerHeight;
+            camera.updateProjectionMatrix();
+            renderer.setSize(window.innerWidth, window.innerHeight);
+        }
+
+        // 控制函数
+        let isStaticMode = false;
+
+        function toggleStaticMode() {
+            isStaticMode = !isStaticMode;
+            const staticContainer = document.getElementById('static-container');
+            const canvasContainer = document.getElementById('canvas-container');
+
+            if (isStaticMode) {
+                staticContainer.classList.add('active');
+                canvasContainer.style.display = 'none';
+            } else {
+                staticContainer.classList.remove('active');
+                canvasContainer.style.display = 'block';
+            }
+        }
+
+        function toggleSidebar() {
+            document.getElementById('sidebar').classList.toggle('active');
+        }
+
+        function toggleControls() {
+            document.getElementById('controls').classList.toggle('active');
+        }
+
+        document.getElementById('rotationSpeed').addEventListener('input', (e) => {
+            rotationSpeed = e.target.value / 3000;
+            document.getElementById('speedValue').textContent = e.target.value;
+        });
+
+        document.getElementById('scale').addEventListener('input', (e) => {
+            scale = e.target.value / 100;
+            if (currentShape) {
+                currentShape.scale.set(scale, scale, scale);
+            }
+            document.getElementById('scaleValue').textContent = e.target.value;
+        });
+
+        function changeColor(color) {
+            if (currentShape) {
+                currentShape.material.color.setHex(color);
+            }
+        }
+
+        function resetScene() {
+            if (confirm('确定要重置场景吗？')) {
+                rotationSpeed = 0.01;
+                scale = 1;
+                document.getElementById('rotationSpeed').value = 30;
+                document.getElementById('scale').value = 100;
+                if (currentShape) {
+                    currentShape.rotation.set(0, 0, 0);
+                    currentShape.scale.set(1, 1, 1);
+                    currentShape.material.color.setHex(0xF59E0B);
+                }
+                document.getElementById('speedValue').textContent = '30';
+                document.getElementById('scaleValue').textContent = '100';
+
+                // 重置为正方形
+                switchShape('square');
+            }
+        }
+
+        // 任务系统切换
+        function toggleTaskSidebar() {
+            if (window.taskSystem) {
+                window.taskSystem.toggle();
+            }
+        }
+
+        // 页面加载完成后初始化
+        document.addEventListener('DOMContentLoaded', () => {
+            // 初始化 Three.js 场景
+            init();
+
+            // 初始化问答系统
+            window.quizSystem = new QuizSystem({
+                lessonId: 'lesson-square',
+                container: document.getElementById('quiz-container'),
+                onAnswer: (result) => {
+                    console.log('Quiz answer:', result);
+                }
+            });
+
+            // 初始化任务系统
+            window.taskSystem = new TaskSystem({
+                lessonId: 'lesson-square',
+                container: document.getElementById('task-container'),
+                onTaskComplete: () => {
+                    console.log('Task completed!');
+                },
+                onGoalComplete: (goalId) => {
+                    console.log('Goal completed:', goalId);
+                }
+            });
+
+            // 默认隐藏任务侧边栏
+            window.taskSystem.hide();
+        });
+    </script>
+</body>
+</html>

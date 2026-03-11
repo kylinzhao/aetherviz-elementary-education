@@ -1,0 +1,706 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>太阳系 - AetherViz 小学教学</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r134/three.min.js"></script>
+    <style>
+        :root {
+            --primary-gradient: linear-gradient(135deg, #1E3A8A 0%, #7C3AED 100%);
+            --bg-gradient: linear-gradient(180deg, #0F172A 0%, #1E1B4B 50%, #312E81 100%);
+        }
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: 'Inter', sans-serif;
+            background: var(--bg-gradient);
+            color: #F8FAFC;
+            font-size: 18px;
+            overflow-x: hidden;
+        }
+        #canvas-container { position: fixed; top: 0; left: 0; width: 100%; height: 100%; z-index: 0; }
+
+        #static-container {
+            position: fixed;
+            top: 70px;
+            left: 0;
+            width: 100%;
+            height: calc(100vh - 70px);
+            display: none;
+            justify-content: center;
+            align-items: center;
+            z-index: 1;
+            background: var(--bg-gradient);
+        }
+
+        #static-container.active {
+            display: flex;
+        }
+
+        .static-diagram {
+            max-width: 90%;
+            max-height: 90%;
+            background: rgba(255, 255, 255, 0.05);
+            border-radius: 20px;
+            padding: 40px;
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+        }
+        .navbar {
+            position: fixed; top: 0; left: 0; right: 0; height: 70px;
+            background: rgba(15, 23, 42, 0.85); backdrop-filter: blur(10px);
+            border-bottom: 2px solid rgba(126, 58, 237, 0.3);
+            display: flex; align-items: center; justify-content: space-between;
+            padding: 0 24px; z-index: 100;
+        }
+        .navbar-title { font-size: 32px; font-weight: bold; background: var(--primary-gradient); -webkit-background-clip: text; -webkit-text-fill-color: transparent; }
+        .btn-kid {
+            min-width: 60px; min-height: 60px; padding: 16px 24px;
+            font-size: 18px; border-radius: 12px; border: none;
+            background: var(--primary-gradient); color: white;
+            cursor: pointer; transition: all 0.3s ease;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+        }
+        .btn-kid:hover { transform: scale(1.05); }
+        .control-panel {
+            position: fixed; right: 0; top: 70px; width: 30%;
+            height: calc(100vh - 70px); background: rgba(49, 46, 129, 0.7);
+            backdrop-filter: blur(10px); border-left: 1px solid rgba(124, 58, 237, 0.25);
+            padding: 24px; overflow-y: auto; z-index: 90;
+        }
+        input[type="range"].kid-slider {
+            -webkit-appearance: none; width: 100%; height: 12px;
+            border-radius: 6px; background: rgba(255, 255, 255, 0.2);
+            cursor: pointer;
+        }
+        input[type="range"].kid-slider::-webkit-slider-thumb {
+            -webkit-appearance: none; width: 32px; height: 32px;
+            border-radius: 50%; background: var(--primary-gradient); cursor: pointer;
+        }
+        .planet-list {
+            max-height: 400px; overflow-y: auto;
+        }
+        .planet-item {
+            display: flex; align-items: center;
+            padding: 12px; margin-bottom: 8px;
+            background: rgba(255, 255, 255, 0.05);
+            border-radius: 8px; cursor: pointer;
+            transition: all 0.3s;
+        }
+        .planet-item:hover {
+            background: rgba(255, 255, 255, 0.1);
+            transform: translateX(4px);
+        }
+        .planet-item.selected {
+            background: var(--primary-gradient);
+        }
+        .planet-icon {
+            width: 32px; height: 32px; border-radius: 50%;
+            margin-right: 12px;
+        }
+        .info-box {
+            padding: 16px; background: rgba(255,255,255,0.05);
+            border-radius: 12px; margin-top: 16px;
+        }
+
+        /* 移动端优化 */
+        @media (max-width: 640px) {
+            .navbar {
+                padding: 0 12px;
+                height: 56px;
+            }
+            .navbar-title {
+                font-size: 20px;
+            }
+            .btn-kid {
+                min-width: 44px;
+                min-height: 44px;
+                padding: 10px 12px;
+                font-size: 14px;
+            }
+            .control-panel {
+                width: 100%;
+                height: 50vh;
+                top: 56px;
+            }
+            body {
+                font-size: 16px;
+            }
+            .planet-icon {
+                width: 28px;
+                height: 28px;
+            }
+        }
+
+        /* 平板端优化 */
+        @media (min-width: 641px) and (max-width: 1024px) {
+            .control-panel {
+                width: 40%;
+            }
+            .navbar-title {
+                font-size: 26px;
+            }
+        }
+
+        /* 触摸设备优化 */
+        @media (hover: none) and (pointer: coarse) {
+            input[type="range"].kid-slider::-webkit-slider-thumb {
+                width: 40px;
+                height: 40px;
+            }
+            .btn-kid {
+                min-height: 48px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div id="canvas-container"></div>
+
+    <!-- 静态展示容器 -->
+    <div id="static-container">
+        <div class="static-diagram">
+            <svg width="600" height="700" viewBox="0 0 600 700">
+                <!-- 标题 -->
+                <text x="300" y="40" text-anchor="middle" fill="#F8FAFC" font-size="28" font-weight="bold">
+                    太阳系
+                </text>
+
+                <!-- 太阳系主图 -->
+                <g transform="translate(50, 80)">
+                    <!-- 背景框 -->
+                    <rect x="0" y="0" width="500" height="500" fill="rgba(255,255,255,0.05)" rx="10"/>
+
+                    <!-- 轨道线 -->
+                    <circle cx="250" cy="250" r="50" fill="none" stroke="rgba(255,255,255,0.2)" stroke-width="1"/>
+                    <circle cx="250" cy="250" r="80" fill="none" stroke="rgba(255,255,255,0.2)" stroke-width="1"/>
+                    <circle cx="250" cy="250" r="110" fill="none" stroke="rgba(255,255,255,0.2)" stroke-width="1"/>
+                    <circle cx="250" cy="250" r="140" fill="none" stroke="rgba(255,255,255,0.2)" stroke-width="1"/>
+                    <circle cx="250" cy="250" r="180" fill="none" stroke="rgba(255,255,255,0.2)" stroke-width="1"/>
+                    <circle cx="250" cy="250" r="215" fill="none" stroke="rgba(255,255,255,0.2)" stroke-width="1"/>
+                    <circle cx="250" cy="250" r="245" fill="none" stroke="rgba(255,255,255,0.2)" stroke-width="1"/>
+                    <circle cx="250" cy="250" r="275" fill="none" stroke="rgba(255,255,255,0.2)" stroke-width="1"/>
+
+                    <!-- 太阳 -->
+                    <circle cx="250" cy="250" r="25" fill="#FCD34D" stroke="#FFFFFF" stroke-width="2"/>
+                    <text x="250" y="255" text-anchor="middle" fill="#D97706" font-size="12" font-weight="bold">太阳</text>
+
+                    <!-- 水星 -->
+                    <circle cx="300" cy="250" r="5" fill="#9CA3AF" stroke="#FFFFFF" stroke-width="1"/>
+                    <text x="300" y="235" text-anchor="middle" fill="#9CA3AF" font-size="11" font-weight="bold">水星</text>
+                    <!-- 公转方向箭头 -->
+                    <path d="M 285 235 A 15 15 0 0 1 300 220" stroke="#9CA3AF" stroke-width="1.5" fill="none" stroke-dasharray="3,2"/>
+                    <polygon points="300,217 303,223 297,222" fill="#9CA3AF"/>
+
+                    <!-- 金星 -->
+                    <circle cx="330" cy="250" r="7" fill="#FDE68A" stroke="#FFFFFF" stroke-width="1"/>
+                    <text x="330" y="232" text-anchor="middle" fill="#FDE68A" font-size="11" font-weight="bold">金星</text>
+                    <path d="M 315 220 A 35 35 0 0 1 350 220" stroke="#FDE68A" stroke-width="1.5" fill="none" stroke-dasharray="3,2"/>
+                    <polygon points="350,217 353,223 347,222" fill="#FDE68A"/>
+
+                    <!-- 地球 -->
+                    <circle cx="360" cy="250" r="8" fill="#3B82F6" stroke="#FFFFFF" stroke-width="1"/>
+                    <text x="360" y="230" text-anchor="middle" fill="#3B82F6" font-size="11" font-weight="bold">地球</text>
+                    <path d="M 340 205 A 45 45 0 0 1 380 205" stroke="#3B82F6" stroke-width="1.5" fill="none" stroke-dasharray="3,2"/>
+                    <polygon points="380,202 383,208 377,207" fill="#3B82F6"/>
+
+                    <!-- 火星 -->
+                    <circle cx="390" cy="250" r="6" fill="#EF4444" stroke="#FFFFFF" stroke-width="1"/>
+                    <text x="390" y="232" text-anchor="middle" fill="#EF4444" font-size="11" font-weight="bold">火星</text>
+                    <path d="M 365 190 A 60 60 0 0 1 415 190" stroke="#EF4444" stroke-width="1.5" fill="none" stroke-dasharray="3,2"/>
+                    <polygon points="415,187 418,193 412,192" fill="#EF4444"/>
+
+                    <!-- 木星 -->
+                    <circle cx="430" cy="250" r="18" fill="#F59E0B" stroke="#FFFFFF" stroke-width="1"/>
+                    <text x="430" y="225" text-anchor="middle" fill="#F59E0B" font-size="11" font-weight="bold">木星</text>
+                    <path d="M 390 170 A 80 80 0 0 1 470 170" stroke="#F59E0B" stroke-width="1.5" fill="none" stroke-dasharray="3,2"/>
+                    <polygon points="470,167 473,173 467,172" fill="#F59E0B"/>
+
+                    <!-- 土星 -->
+                    <circle cx="465" cy="250" r="15" fill="#FBBF24" stroke="#FFFFFF" stroke-width="1"/>
+                    <!-- 土星环 -->
+                    <ellipse cx="465" cy="250" rx="25" ry="5" fill="none" stroke="#FBBF24" stroke-width="3"/>
+                    <text x="465" y="222" text-anchor="middle" fill="#FBBF24" font-size="11" font-weight="bold">土星</text>
+                    <path d="M 415 145 A 95 95 0 0 1 515 145" stroke="#FBBF24" stroke-width="1.5" fill="none" stroke-dasharray="3,2"/>
+                    <polygon points="515,142 518,148 512,147" fill="#FBBF24"/>
+
+                    <!-- 天王星 -->
+                    <circle cx="495" cy="250" r="10" fill="#67E8F9" stroke="#FFFFFF" stroke-width="1"/>
+                    <text x="495" y="228" text-anchor="middle" fill="#67E8F9" font-size="11" font-weight="bold">天王星</text>
+                    <path d="M 435 120 A 110 110 0 0 1 555 120" stroke="#67E8F9" stroke-width="1.5" fill="none" stroke-dasharray="3,2"/>
+                    <polygon points="555,117 558,123 552,122" fill="#67E8F9"/>
+
+                    <!-- 海王星 -->
+                    <circle cx="525" cy="250" r="10" fill="#3B82F6" stroke="#FFFFFF" stroke-width="1"/>
+                    <text x="525" y="228" text-anchor="middle" fill="#3B82F6" font-size="11" font-weight="bold">海王星</text>
+                    <path d="M 450 95 A 125 125 0 0 1 600 95" stroke="#3B82F6" stroke-width="1.5" fill="none" stroke-dasharray="3,2"/>
+                    <polygon points="600,92 603,98 597,97" fill="#3B82F6"/>
+
+                    <!-- 公转方向说明 -->
+                    <text x="250" y="480" text-anchor="middle" fill="#F8FAFC" font-size="14">
+                        箭头表示公转方向（从上往下看为逆时针）
+                    </text>
+                </g>
+
+                <!-- 行星信息卡片 -->
+                <g transform="translate(50, 600)">
+                    <rect x="0" y="0" width="500" height="80" fill="rgba(255,255,255,0.05)" rx="10"/>
+                    <text x="250" y="25" text-anchor="middle" fill="#F8FAFC" font-size="16" font-weight="bold">
+                        八大行星（从内到外）
+                    </text>
+                    <text x="250" y="50" text-anchor="middle" fill="#CBD5E1" font-size="14">
+                        水星 → 金星 → 地球 → 火星 → 木星 → 土星 → 天王星 → 海王星
+                    </text>
+                    <text x="250" y="70" text-anchor="middle" fill="#F59E0B" font-size="12">
+                        注意：行星大小未按真实比例，仅为示意图
+                    </text>
+                </g>
+            </svg>
+        </div>
+    </div>
+
+    <nav class="navbar">
+        <div style="display: flex; align-items: center; gap: 16px;">
+            <button class="btn-kid" onclick="window.location.href='../'">
+                🏠 返回首页
+            </button>
+            <div class="navbar-title">🌍 太阳系</div>
+        </div>
+        <div style="display: flex; gap: 12px;">
+            <button class="btn-kid" onclick="toggleStaticMode()">
+                🖼️ 静态展示
+            </button>
+            <button class="btn-kid" onclick="toggleControls()">🎮 控制</button>
+        </div>
+    </nav>
+
+    <aside class="control-panel" id="controls">
+        <h2 style="font-size: 24px; margin-bottom: 16px;">🪐 行星选择</h2>
+
+        <div class="planet-list">
+            <div class="planet-item" onclick="selectPlanet('sun')">
+                <div class="planet-icon" style="background: #FCD34D;"></div>
+                <div>
+                    <div style="font-weight: bold;">☀️ 太阳</div>
+                    <div style="font-size: 12px; color: rgba(255,255,255,0.6);">恒星</div>
+                </div>
+            </div>
+            <div class="planet-item" onclick="selectPlanet('mercury')">
+                <div class="planet-icon" style="background: #9CA3AF;"></div>
+                <div>
+                    <div style="font-weight: bold;">水星</div>
+                    <div style="font-size: 12px; color: rgba(255,255,255,0.6);">88天公转</div>
+                </div>
+            </div>
+            <div class="planet-item" onclick="selectPlanet('venus')">
+                <div class="planet-icon" style="background: #FDE68A;"></div>
+                <div>
+                    <div style="font-weight: bold;">金星</div>
+                    <div style="font-size: 12px; color: rgba(255,255,255,0.6);">225天公转</div>
+                </div>
+            </div>
+            <div class="planet-item" onclick="selectPlanet('earth')">
+                <div class="planet-icon" style="background: #3B82F6;"></div>
+                <div>
+                    <div style="font-weight: bold;">地球</div>
+                    <div style="font-size: 12px; color: rgba(255,255,255,0.6);">365天公转</div>
+                </div>
+            </div>
+            <div class="planet-item" onclick="selectPlanet('mars')">
+                <div class="planet-icon" style="background: #EF4444;"></div>
+                <div>
+                    <div style="font-weight: bold;">火星</div>
+                    <div style="font-size: 12px; color: rgba(255,255,255,0.6);">687天公转</div>
+                </div>
+            </div>
+            <div class="planet-item" onclick="selectPlanet('jupiter')">
+                <div class="planet-icon" style="background: #F59E0B;"></div>
+                <div>
+                    <div style="font-weight: bold;">木星</div>
+                    <div style="font-size: 12px; color: rgba(255,255,255,0.6);">12年公转</div>
+                </div>
+            </div>
+            <div class="planet-item" onclick="selectPlanet('saturn')">
+                <div class="planet-icon" style="background: #FBBF24;"></div>
+                <div>
+                    <div style="font-weight: bold;">土星</div>
+                    <div style="font-size: 12px; color: rgba(255,255,255,0.6);">29年公转</div>
+                </div>
+            </div>
+            <div class="planet-item" onclick="selectPlanet('uranus')">
+                <div class="planet-icon" style="background: #67E8F9;"></div>
+                <div>
+                    <div style="font-weight: bold;">天王星</div>
+                    <div style="font-size: 12px; color: rgba(255,255,255,0.6);">84年公转</div>
+                </div>
+            </div>
+            <div class="planet-item" onclick="selectPlanet('neptune')">
+                <div class="planet-icon" style="background: #3B82F6;"></div>
+                <div>
+                    <div style="font-weight: bold;">海王星</div>
+                    <div style="font-size: 12px; color: rgba(255,255,255,0.6);">165年公转</div>
+                </div>
+            </div>
+        </div>
+
+        <div style="margin-bottom: 24px;">
+            <label style="display: block; margin-bottom: 8px;">⏱️ 时间流逝速度</label>
+            <input type="range" class="kid-slider" id="speed" min="0" max="3" step="0.1" value="0.5" oninput="updateSpeed()">
+            <div style="text-align: center; margin-top: 8px;">
+                速度: <span id="speedValue">0.5</span>x
+            </div>
+            <div style="font-size: 12px; color: rgba(255,255,255,0.5); margin-top: 4px;">
+                水星最快，海王星最慢
+            </div>
+        </div>
+
+        <div class="info-box">
+            <h3 style="font-size: 18px; margin-bottom: 8px;" id="planetName">☀️ 太阳</h3>
+            <p style="font-size: 14px; line-height: 1.6; margin-bottom: 12px;" id="planetDesc">
+                太阳是太阳系的中心，是一颗巨大的发光恒星，为整个太阳系提供光和热。
+            </p>
+            <div id="planetStats" style="font-size: 13px; color: rgba(255,255,255,0.7);">
+                <div>📏 直径: 139 万公里</div>
+                <div>🌡️ 表面温度: 5500°C</div>
+                <div>📍 距离地球: 1.5 亿公里</div>
+            </div>
+            <div id="orbitInfo" style="font-size: 13px; color: rgba(255,255,255,0.5); margin-top: 8px;">
+                自转约27天
+            </div>
+        </div>
+    </aside>
+
+    <script>
+        let scene, camera, renderer, solarSystem;
+        let speed = 0.5;
+        let planets = {};
+        let orbits = {};
+        let selectedPlanet = 'sun';
+
+        const planetData = {
+            sun: {
+                name: '☀️ 太阳',
+                desc: '太阳是太阳系的中心，是一颗巨大的发光恒星，为整个太阳系提供光和热。',
+                color: 0xFCD34D,
+                size: 3,
+                distance: 0,
+                stats: {
+                    diameter: '139 万公里',
+                    temp: '5500°C',
+                    distanceFromEarth: '0',
+                    period: '自转约27天'
+                }
+            },
+            mercury: {
+                name: '水星',
+                desc: '水星是离太阳最近的行星，也是最小的行星。表面布满陨石坑。',
+                color: 0x9CA3AF,
+                size: 0.3,
+                distance: 5,
+                speed: 4.15,
+                stats: {
+                    diameter: '4,879 公里',
+                    temp: '-180°C 至 430°C',
+                    distanceFromSun: '5790 万公里',
+                    period: '88天'
+                }
+            },
+            venus: {
+                name: '金星',
+                desc: '金星是夜空中最亮的行星，有浓厚的大气层，温室效应严重。',
+                color: 0xFDE68A,
+                size: 0.5,
+                distance: 7,
+                speed: 1.62,
+                stats: {
+                    diameter: '12,104 公里',
+                    temp: '465°C',
+                    distanceFromSun: '1.08 亿公里',
+                    period: '225天'
+                }
+            },
+            earth: {
+                name: '地球',
+                desc: '地球是我们的家园，唯一已知存在生命的行星，71%被水覆盖。',
+                color: 0x3B82F6,
+                size: 0.5,
+                distance: 9,
+                speed: 1,
+                stats: {
+                    diameter: '12,742 公里',
+                    temp: '平均15°C',
+                    distanceFromSun: '1.5 亿公里',
+                    period: '365天'
+                }
+            },
+            mars: {
+                name: '火星',
+                desc: '火星被称为"红色星球"，表面有氧化铁。有太阳系最高的山——奥林帕斯山。',
+                color: 0xEF4444,
+                size: 0.4,
+                distance: 11,
+                speed: 0.53,
+                stats: {
+                    diameter: '6,779 公里',
+                    temp: '-65°C',
+                    distanceFromSun: '2.28 亿公里',
+                    period: '687天'
+                }
+            },
+            jupiter: {
+                name: '木星',
+                desc: '木星是最大的行星，著名的大红斑是其标志。拥有79颗已知卫星。',
+                color: 0xF59E0B,
+                size: 1.5,
+                distance: 15,
+                speed: 0.08,
+                stats: {
+                    diameter: '139,820 公里',
+                    temp: '-110°C',
+                    distanceFromSun: '7.78 亿公里',
+                    period: '12年'
+                }
+            },
+            saturn: {
+                name: '土星',
+                desc: '土星以其美丽的环系统著称，主要由冰块和岩石组成。是密度最小的行星。',
+                color: 0xFBBF24,
+                size: 1.3,
+                distance: 19,
+                speed: 0.03,
+                stats: {
+                    diameter: '116,460 公里',
+                    temp: '-140°C',
+                    distanceFromSun: '14.3 亿公里',
+                    period: '29年'
+                }
+            },
+            uranus: {
+                name: '天王星',
+                desc: '天王星是"躺着旋转"的行星，自转轴倾斜角度98度。是最冷的行星。',
+                color: 0x67E8F9,
+                size: 0.9,
+                distance: 23,
+                speed: 0.01,
+                stats: {
+                    diameter: '50,724 公里',
+                    temp: '-195°C',
+                    distanceFromSun: '28.7 亿公里',
+                    period: '84年'
+                }
+            },
+            neptune: {
+                name: '海王星',
+                desc: '海王星是离太阳最远的行星，有强烈的风暴，风速可达2100公里/小时。',
+                color: 0x3B82F6,
+                size: 0.9,
+                distance: 27,
+                speed: 0.006,
+                stats: {
+                    diameter: '49,244 公里',
+                    temp: '-200°C',
+                    distanceFromSun: '45 亿公里',
+                    period: '165年'
+                }
+            }
+        };
+
+        function init() {
+            const container = document.getElementById('canvas-container');
+            scene = new THREE.Scene();
+            camera = new THREE.PerspectiveCamera(60, window.innerWidth / window.innerHeight, 0.1, 1000);
+            camera.position.set(0, 20, 35);
+            camera.lookAt(0, 0, 0);
+            renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
+            renderer.setSize(window.innerWidth, window.innerHeight);
+            container.appendChild(renderer.domElement);
+
+            const ambientLight = new THREE.AmbientLight(0xffffff, 0.4);
+            scene.add(ambientLight);
+
+            const sunLight = new THREE.PointLight(0xffffff, 2, 100);
+            sunLight.position.set(0, 0, 0);
+            scene.add(sunLight);
+
+            createSolarSystem();
+            window.addEventListener('resize', onWindowResize);
+            animate();
+        }
+
+        function createSolarSystem() {
+            if (solarSystem) scene.remove(solarSystem);
+            solarSystem = new THREE.Group();
+            planets = {};
+            orbits = {};
+
+            // 创建星空背景
+            const starsGeometry = new THREE.BufferGeometry();
+            const starPositions = [];
+            for (let i = 0; i < 1000; i++) {
+                starPositions.push(
+                    (Math.random() - 0.5) * 200,
+                    (Math.random() - 0.5) * 200,
+                    (Math.random() - 0.5) * 200
+                );
+            }
+            starsGeometry.setAttribute('position', new THREE.Float32BufferAttribute(starPositions, 3));
+            const starsMaterial = new THREE.PointsMaterial({ color: 0xffffff, size: 0.2 });
+            const stars = new THREE.Points(starsGeometry, starsMaterial);
+            solarSystem.add(stars);
+
+            // 创建行星
+            Object.keys(planetData).forEach(key => {
+                const data = planetData[key];
+
+                // 创建轨道
+                if (data.distance > 0) {
+                    const orbitGeometry = new THREE.RingGeometry(data.distance - 0.05, data.distance + 0.05, 64);
+                    const orbitMaterial = new THREE.MeshBasicMaterial({
+                        color: 0xffffff,
+                        side: THREE.DoubleSide,
+                        transparent: true,
+                        opacity: 0.2
+                    });
+                    const orbit = new THREE.Mesh(orbitGeometry, orbitMaterial);
+                    orbit.rotation.x = Math.PI / 2;
+                    solarSystem.add(orbit);
+                    orbits[key] = orbit;
+                }
+
+                // 创建行星
+                const geometry = new THREE.SphereGeometry(data.size, 32, 32);
+                const material = new THREE.MeshStandardMaterial({
+                    color: data.color,
+                    emissive: data.color,
+                    emissiveIntensity: key === 'sun' ? 1 : 0.2
+                });
+                const planet = new THREE.Mesh(geometry, material);
+
+                planet.position.x = data.distance;
+                planet.userData = { key, data, angle: Math.random() * Math.PI * 2 };
+
+                // 土星环
+                if (key === 'saturn') {
+                    const ringGeometry = new THREE.RingGeometry(data.size * 1.4, data.size * 2, 32);
+                    const ringMaterial = new THREE.MeshBasicMaterial({
+                        color: 0xFBBF24,
+                        side: THREE.DoubleSide,
+                        transparent: true,
+                        opacity: 0.6
+                    });
+                    const ring = new THREE.Mesh(ringGeometry, ringMaterial);
+                    ring.rotation.x = Math.PI / 2;
+                    planet.add(ring);
+                }
+
+                solarSystem.add(planet);
+                planets[key] = planet;
+            });
+
+            scene.add(solarSystem);
+        }
+
+        function selectPlanet(key) {
+            selectedPlanet = key;
+            const data = planetData[key];
+
+            // 更新信息面板
+            document.getElementById('planetName').textContent = data.name;
+            document.getElementById('planetDesc').textContent = data.desc;
+
+            let statsHTML = `<div>📏 直径: ${data.stats.diameter}</div>`;
+            statsHTML += `<div>🌡️ 温度: ${data.stats.temp}</div>`;
+
+            if (key === 'sun') {
+                statsHTML += `<div>📍 距离地球: ${data.stats.distanceFromEarth}</div>`;
+            } else {
+                statsHTML += `<div>📍 距离太阳: ${data.stats.distanceFromSun}</div>`;
+            }
+
+            document.getElementById('planetStats').innerHTML = statsHTML;
+            document.getElementById('orbitInfo').textContent = `公转周期: ${data.stats.period}`;
+
+            // 高亮选中的行星
+            document.querySelectorAll('.planet-item').forEach(item => {
+                item.classList.remove('selected');
+            });
+            event.currentTarget.classList.add('selected');
+
+            // 将相机对准选中的行星
+            const planet = planets[key];
+            if (planet) {
+                const targetPos = planet.position.clone();
+                camera.position.set(targetPos.x + 5, targetPos.y + 5, targetPos.z + 10);
+                camera.lookAt(targetPos);
+            }
+        }
+
+        function updateSpeed() {
+            speed = parseFloat(document.getElementById('speed').value);
+            document.getElementById('speedValue').textContent = speed;
+        }
+
+        function toggleControls() {
+            document.getElementById('controls').classList.toggle('active');
+        }
+
+        let isStaticMode = false;
+
+        function toggleStaticMode() {
+            isStaticMode = !isStaticMode;
+            const staticContainer = document.getElementById('static-container');
+            const canvasContainer = document.getElementById('canvas-container');
+
+            if (isStaticMode) {
+                staticContainer.classList.add('active');
+                canvasContainer.style.display = 'none';
+            } else {
+                staticContainer.classList.remove('active');
+                canvasContainer.style.display = 'block';
+            }
+        }
+
+        function onWindowResize() {
+            camera.aspect = window.innerWidth / window.innerHeight;
+            camera.updateProjectionMatrix();
+            renderer.setSize(window.innerWidth, window.innerHeight);
+        }
+
+        function animate() {
+            requestAnimationFrame(animate);
+
+            // 更新行星位置 - 使用相对速度
+            Object.keys(planets).forEach(key => {
+                if (key === 'sun') return;
+
+                const planet = planets[key];
+                const data = planetData[key];
+
+                // 使用相对速度，水星最快(4.15)，海王星最慢(0.006)
+                planet.userData.angle += data.speed * speed * 0.005;
+                planet.position.x = Math.cos(planet.userData.angle) * data.distance;
+                planet.position.z = Math.sin(planet.userData.angle) * data.distance;
+
+                // 行星自转
+                planet.rotation.y += 0.01;
+            });
+
+            // 太阳自转
+            if (planets.sun) {
+                planets.sun.rotation.y += 0.002;
+            }
+
+            // 轨道线缓慢旋转增加视觉效果
+            Object.keys(orbits).forEach(key => {
+                if (orbits[key]) {
+                    orbits[key].rotation.y += 0.0001;
+                }
+            });
+
+            renderer.render(scene, camera);
+        }
+
+        document.addEventListener('DOMContentLoaded', init);
+    </script>
+</body>
+</html>

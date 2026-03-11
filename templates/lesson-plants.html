@@ -1,0 +1,687 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>植物生长 - AetherViz 小学教学</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r134/three.min.js"></script>
+    <style>
+        :root {
+            --primary-gradient: linear-gradient(135deg, #10B981 0%, #059669 100%);
+            --bg-gradient: linear-gradient(180deg, #0F172A 0%, #064E3B 50%, #065F46 100%);
+        }
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: 'Inter', sans-serif;
+            background: var(--bg-gradient);
+            color: #F8FAFC;
+            font-size: 18px;
+            overflow-x: hidden;
+        }
+        #canvas-container { position: fixed; top: 0; left: 0; width: 100%; height: 100%; z-index: 0; }
+
+        #static-container {
+            position: fixed;
+            top: 70px;
+            left: 0;
+            width: 100%;
+            height: calc(100vh - 70px);
+            display: none;
+            justify-content: center;
+            align-items: center;
+            z-index: 1;
+            background: var(--bg-gradient);
+        }
+
+        #static-container.active {
+            display: flex;
+        }
+
+        .static-diagram {
+            max-width: 90%;
+            max-height: 90%;
+            background: rgba(255, 255, 255, 0.05);
+            border-radius: 20px;
+            padding: 40px;
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+        }
+        .navbar {
+            position: fixed; top: 0; left: 0; right: 0; height: 70px;
+            background: rgba(15, 23, 42, 0.85); backdrop-filter: blur(10px);
+            border-bottom: 2px solid rgba(16, 185, 129, 0.3);
+            display: flex; align-items: center; justify-content: space-between;
+            padding: 0 24px; z-index: 100;
+        }
+        .navbar-title { font-size: 32px; font-weight: bold; background: var(--primary-gradient); -webkit-background-clip: text; -webkit-text-fill-color: transparent; }
+        .btn-kid {
+            min-width: 60px; min-height: 60px; padding: 16px 24px;
+            font-size: 18px; border-radius: 12px; border: none;
+            background: var(--primary-gradient); color: white;
+            cursor: pointer; transition: all 0.3s ease;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+        }
+        .btn-kid:hover { transform: scale(1.05); }
+        .control-panel {
+            position: fixed; right: 0; top: 70px; width: 30%;
+            height: calc(100vh - 70px); background: rgba(6, 78, 59, 0.7);
+            backdrop-filter: blur(10px); border-left: 1px solid rgba(16, 185, 129, 0.25);
+            padding: 24px; overflow-y: auto; z-index: 90;
+        }
+        input[type="range"].kid-slider {
+            -webkit-appearance: none; width: 100%; height: 12px;
+            border-radius: 6px; background: rgba(255, 255, 255, 0.2);
+            cursor: pointer;
+        }
+        input[type="range"].kid-slider::-webkit-slider-thumb {
+            -webkit-appearance: none; width: 32px; height: 32px;
+            border-radius: 50%; background: var(--primary-gradient); cursor: pointer;
+        }
+        .stage-display {
+            text-align: center; padding: 16px;
+            background: rgba(255, 255, 255, 0.05);
+            border-radius: 12px; margin: 16px 0;
+        }
+        .stage-indicator {
+            display: flex; justify-content: space-between;
+            margin: 16px 0;
+        }
+        .stage-dot {
+            width: 12px; height: 12px; border-radius: 50%;
+            background: rgba(255, 255, 255, 0.3);
+            transition: all 0.3s;
+        }
+        .stage-dot.active {
+            background: #10B981;
+            box-shadow: 0 0 10px rgba(16, 185, 129, 0.5);
+        }
+        .info-box {
+            padding: 16px; background: rgba(255,255,255,0.05);
+            border-radius: 12px; margin-top: 16px;
+        }
+
+        /* 移动端优化 */
+        @media (max-width: 640px) {
+            .navbar {
+                padding: 0 12px;
+                height: 56px;
+            }
+            .navbar-title {
+                font-size: 20px;
+            }
+            .btn-kid {
+                min-width: 44px;
+                min-height: 44px;
+                padding: 10px 12px;
+                font-size: 14px;
+            }
+            .control-panel {
+                width: 100%;
+                height: 50vh;
+                top: 56px;
+            }
+            body {
+                font-size: 16px;
+            }
+        }
+
+        /* 平板端优化 */
+        @media (min-width: 641px) and (max-width: 1024px) {
+            .control-panel {
+                width: 40%;
+            }
+            .navbar-title {
+                font-size: 26px;
+            }
+        }
+
+        /* 触摸设备优化 */
+        @media (hover: none) and (pointer: coarse) {
+            input[type="range"].kid-slider::-webkit-slider-thumb {
+                width: 40px;
+                height: 40px;
+            }
+            .btn-kid {
+                min-height: 48px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div id="canvas-container"></div>
+
+    <!-- 静态展示容器 -->
+    <div id="static-container">
+        <div class="static-diagram">
+            <svg width="600" height="700" viewBox="0 0 600 700">
+                <!-- 标题 -->
+                <text x="300" y="40" text-anchor="middle" fill="#F8FAFC" font-size="28" font-weight="bold">
+                    植物生长过程
+                </text>
+
+                <!-- 种子结构 -->
+                <g transform="translate(50, 80)">
+                    <rect x="0" y="0" width="240" height="180" fill="rgba(255,255,255,0.1)" rx="10"/>
+                    <text x="120" y="30" text-anchor="middle" fill="#F8FAFC" font-size="20" font-weight="bold">
+                        种子结构
+                    </text>
+
+                    <!-- 种子外轮廓 -->
+                    <ellipse cx="120" cy="110" rx="60" ry="40" fill="#D2691E" stroke="#FFFFFF" stroke-width="2"/>
+
+                    <!-- 胚根 -->
+                    <path d="M 120 110 Q 120 140 120 150" stroke="#22C55E" stroke-width="4" fill="none"/>
+                    <circle cx="120" cy="150" r="5" fill="#22C55E"/>
+                    <text x="130" y="145" fill="#22C55E" font-size="16" font-weight="bold">胚根</text>
+
+                    <!-- 胚芽 -->
+                    <path d="M 120 110 Q 110 90 100 80" stroke="#32CD32" stroke-width="3" fill="none"/>
+                    <ellipse cx="100" cy="75" rx="8" ry="5" fill="#32CD32"/>
+                    <text x="70" y="70" fill="#32CD32" font-size="16" font-weight="bold">胚芽</text>
+
+                    <!-- 子叶 -->
+                    <ellipse cx="120" cy="95" rx="25" ry="12" fill="#228B22" stroke="#FFFFFF" stroke-width="1"/>
+                    <text x="155" y="100" fill="#228B22" font-size="16" font-weight="bold">子叶</text>
+                </g>
+
+                <!-- 生长阶段 -->
+                <g transform="translate(310, 80)">
+                    <rect x="0" y="0" width="240" height="180" fill="rgba(255,255,255,0.1)" rx="10"/>
+                    <text x="120" y="30" text-anchor="middle" fill="#F8FAFC" font-size="20" font-weight="bold">
+                        生长阶段
+                    </text>
+
+                    <!-- 阶段1: 种子 -->
+                    <circle cx="40" cy="70" r="12" fill="#D2691E" stroke="#FFFFFF" stroke-width="1"/>
+                    <text x="40" y="100" text-anchor="middle" fill="#F8FAFC" font-size="14">种子</text>
+
+                    <!-- 箭头 -->
+                    <path d="M 60 70 L 80 70" stroke="#F59E0B" stroke-width="2" fill="none"/>
+                    <polygon points="80,65 90,70 80,75" fill="#F59E0B"/>
+
+                    <!-- 阶段2: 发芽 -->
+                    <circle cx="110" cy="70" r="5" fill="#D2691E"/>
+                    <line x1="110" y1="70" x2="110" y2="85" stroke="#22C55E" stroke-width="2"/>
+                    <ellipse cx="110" cy="88" rx="10" ry="5" fill="#32CD32"/>
+                    <text x="110" y="100" text-anchor="middle" fill="#F8FAFC" font-size="14">发芽</text>
+
+                    <!-- 箭头 -->
+                    <path d="M 130 70 L 150 70" stroke="#F59E0B" stroke-width="2" fill="none"/>
+                    <polygon points="150,65 160,70 150,75" fill="#F59E0B"/>
+
+                    <!-- 阶段3: 幼苗 -->
+                    <line x1="180" y1="85" x2="180" y2="55" stroke="#228B22" stroke-width="3"/>
+                    <ellipse cx="180" cy="50" rx="12" ry="6" fill="#32CD32"/>
+                    <ellipse cx="170" cy="60" rx="8" ry="4" fill="#32CD32"/>
+                    <ellipse cx="190" cy="60" rx="8" ry="4" fill="#32CD32"/>
+                    <text x="180" y="100" text-anchor="middle" fill="#F8FAFC" font-size="14">幼苗</text>
+
+                    <!-- 阶段4: 成株 -->
+                    <g transform="translate(40, 130)">
+                        <line x1="20" y1="40" x2="20" y2="10" stroke="#228B22" stroke-width="4"/>
+                        <ellipse cx="20" cy="8" rx="15" ry="8" fill="#32CD32"/>
+                        <ellipse cx="8" cy="20" rx="10" ry="5" fill="#32CD32"/>
+                        <ellipse cx="32" cy="20" rx="10" ry="5" fill="#32CD32"/>
+                        <circle cx="20" cy="0" r="8" fill="#FF69B4"/>
+                        <circle cx="12" cy="-3" r="6" fill="#FF69B4"/>
+                        <circle cx="28" cy="-3" r="6" fill="#FF69B4"/>
+                        <text x="20" y="50" text-anchor="middle" fill="#F8FAFC" font-size="14">成株</text>
+                    </g>
+
+                    <!-- 箭头 -->
+                    <path d="M 80 160 L 100 160" stroke="#F59E0B" stroke-width="2" fill="none"/>
+                    <polygon points="100,155 110,160 100,165" fill="#F59E0B"/>
+
+                    <!-- 阶段5: 开花结果 -->
+                    <g transform="translate(140, 130)">
+                        <line x1="20" y1="40" x2="20" y2="10" stroke="#228B22" stroke-width="4"/>
+                        <ellipse cx="20" cy="8" rx="15" ry="8" fill="#32CD32"/>
+                        <circle cx="20" cy="-5" r="12" fill="#FFD700"/>
+                        <circle cx="20" cy="25" r="10" fill="#FF6347" stroke="#FFFFFF" stroke-width="1"/>
+                        <text x="20" y="50" text-anchor="middle" fill="#F8FAFC" font-size="14">开花结果</text>
+                    </g>
+                </g>
+
+                <!-- 光合作用 -->
+                <g transform="translate(50, 290)">
+                    <rect x="0" y="0" width="500" height="180" fill="rgba(255,255,255,0.1)" rx="10"/>
+                    <text x="250" y="30" text-anchor="middle" fill="#F8FAFC" font-size="20" font-weight="bold">
+                        光合作用
+                    </text>
+
+                    <!-- 太阳 -->
+                    <circle cx="80" cy="100" r="30" fill="#FCD34D" stroke="#FFFFFF" stroke-width="2"/>
+                    <text x="80" y="105" text-anchor="middle" fill="#D97706" font-size="14" font-weight="bold">阳光</text>
+
+                    <!-- 光线箭头 -->
+                    <g>
+                        <line x1="115" y1="85" x2="175" y2="85" stroke="#FCD34D" stroke-width="3" stroke-dasharray="5,5"/>
+                        <polygon points="175,80 185,85 175,90" fill="#FCD34D"/>
+                        <line x1="115" y1="100" x2="175" y2="100" stroke="#FCD34D" stroke-width="3" stroke-dasharray="5,5"/>
+                        <polygon points="175,95 185,100 175,105" fill="#FCD34D"/>
+                        <line x1="115" y1="115" x2="175" y2="115" stroke="#FCD34D" stroke-width="3" stroke-dasharray="5,5"/>
+                        <polygon points="175,110 185,115 175,120" fill="#FCD34D"/>
+                    </g>
+
+                    <!-- 植物叶子 -->
+                    <ellipse cx="220" cy="100" rx="40" ry="25" fill="#32CD32" stroke="#228B22" stroke-width="2"/>
+                    <text x="220" y="105" text-anchor="middle" fill="#FFFFFF" font-size="14" font-weight="bold">叶子</text>
+
+                    <!-- 水分箭头 -->
+                    <g>
+                        <line x1="280" y1="130" x2="280" y2="110" stroke="#3B82F6" stroke-width="3" stroke-dasharray="5,5"/>
+                        <polygon points="275,110 280,100 285,110" fill="#3B82F6"/>
+                        <text x="280" y="150" text-anchor="middle" fill="#3B82F6" font-size="14" font-weight="bold">水分</text>
+                    </g>
+
+                    <!-- 二氧化碳箭头 -->
+                    <g>
+                        <line x1="280" y1="70" x2="280" y2="90" stroke="#9CA3AF" stroke-width="3" stroke-dasharray="5,5"/>
+                        <polygon points="275,90 280,100 285,90" fill="#9CA3AF"/>
+                        <text x="280" y="55" text-anchor="middle" fill="#9CA3AF" font-size="14" font-weight="bold">二氧化碳</text>
+                    </g>
+
+                    <!-- 氧气输出箭头 -->
+                    <g>
+                        <line x1="330" y1="100" x2="390" y2="100" stroke="#22C55E" stroke-width="3" stroke-dasharray="5,5"/>
+                        <polygon points="385,95 395,100 385,105" fill="#22C55E"/>
+                        <text x="360" y="90" text-anchor="middle" fill="#22C55E" font-size="14" font-weight="bold">氧气</text>
+                    </g>
+
+                    <!-- 养分输出箭头 -->
+                    <g>
+                        <line x1="220" y1="130" x2="220" y2="155" stroke="#F59E0B" stroke-width="3" stroke-dasharray="5,5"/>
+                        <polygon points="215,150 220,160 225,150" fill="#F59E0B"/>
+                        <text x="220" y="172" text-anchor="middle" fill="#F59E0B" font-size="14" font-weight="bold">养分</text>
+                    </g>
+                </g>
+
+                <!-- 植物需求 -->
+                <g transform="translate(50, 500)">
+                    <rect x="0" y="0" width="500" height="150" fill="rgba(255,255,255,0.1)" rx="10"/>
+                    <text x="250" y="30" text-anchor="middle" fill="#F8FAFC" font-size="20" font-weight="bold">
+                        植物生长需要的条件
+                    </text>
+
+                    <g transform="translate(30, 50)">
+                        <circle cx="25" cy="25" r="20" fill="#FCD34D"/>
+                        <text x="25" y="30" text-anchor="middle" fill="#D97706" font-size="20">☀️</text>
+                        <text x="25" y="60" text-anchor="middle" fill="#F8FAFC" font-size="16">阳光</text>
+                    </g>
+
+                    <g transform="translate(140, 50)">
+                        <circle cx="25" cy="25" r="20" fill="#3B82F6"/>
+                        <text x="25" y="30" text-anchor="middle" fill="#FFFFFF" font-size="20">💧</text>
+                        <text x="25" y="60" text-anchor="middle" fill="#F8FAFC" font-size="16">水分</text>
+                    </g>
+
+                    <g transform="translate(250, 50)">
+                        <circle cx="25" cy="25" r="20" fill="#9CA3AF"/>
+                        <text x="25" y="30" text-anchor="middle" fill="#FFFFFF" font-size="20">💨</text>
+                        <text x="25" y="60" text-anchor="middle" fill="#F8FAFC" font-size="16">空气</text>
+                    </g>
+
+                    <g transform="translate(360, 50)">
+                        <circle cx="25" cy="25" r="20" fill="#8B4513"/>
+                        <text x="25" y="30" text-anchor="middle" fill="#FFFFFF" font-size="20">🌱</text>
+                        <text x="25" y="60" text-anchor="middle" fill="#F8FAFC" font-size="16">土壤</text>
+                    </g>
+                </g>
+            </svg>
+        </div>
+    </div>
+
+    <nav class="navbar">
+        <div style="display: flex; align-items: center; gap: 16px;">
+            <button class="btn-kid" onclick="window.location.href='../'">
+                🏠 返回首页
+            </button>
+            <div class="navbar-title">🌱 植物生长</div>
+        </div>
+        <div style="display: flex; gap: 12px;">
+            <button class="btn-kid" onclick="toggleStaticMode()">
+                🖼️ 静态展示
+            </button>
+            <button class="btn-kid" onclick="toggleControls()">🎮 控制</button>
+        </div>
+    </nav>
+
+    <aside class="control-panel" id="controls">
+        <h2 style="font-size: 24px; margin-bottom: 16px;">🌱 生长控制</h2>
+
+        <button class="btn-kid" onclick="playGrowthAnimation()" style="width: 100%; margin-bottom: 16px;">
+            🎬 播放生长动画
+        </button>
+
+        <div style="margin-bottom: 24px;">
+            <label style="display: block; margin-bottom: 8px;">⏱️ 生长阶段（时间轴）</label>
+            <input type="range" class="kid-slider" id="growthStage" min="0" max="4" step="0.01" value="0" oninput="updateGrowth()">
+            <div style="text-align: center; margin-top: 8px;">
+                <span id="stageText">种子</span>
+            </div>
+        </div>
+
+        <div style="margin-bottom: 24px;">
+            <label style="display: block; margin-bottom: 8px;">💧 水分</label>
+            <input type="range" class="kid-slider" id="water" min="0" max="100" value="50" oninput="updatePlantHealth()">
+            <div style="text-align: center; margin-top: 8px;">
+                <span id="waterText">50</span>%
+            </div>
+        </div>
+
+        <div style="margin-bottom: 24px;">
+            <label style="display: block; margin-bottom: 8px;">☀️ 阳光</label>
+            <input type="range" class="kid-slider" id="sunlight" min="0" max="100" value="50" oninput="updatePlantHealth()">
+            <div style="text-align: center; margin-top: 8px;">
+                <span id="sunText">50</span>%
+            </div>
+        </div>
+
+        <div class="stage-display">
+            <h3 style="font-size: 18px; margin-bottom: 12px;">📍 生长阶段</h3>
+            <div class="stage-indicator">
+                <div class="stage-dot active" id="dot0"></div>
+                <div class="stage-dot" id="dot1"></div>
+                <div class="stage-dot" id="dot2"></div>
+                <div class="stage-dot" id="dot3"></div>
+                <div class="stage-dot" id="dot4"></div>
+            </div>
+            <div style="font-size: 12px; margin-top: 8px; color: rgba(255,255,255,0.6);">
+                种子 → 发芽 → 生长 → 开花 → 结果
+            </div>
+        </div>
+
+        <div class="info-box">
+            <h3 style="font-size: 16px; margin-bottom: 8px;">💡 小知识</h3>
+            <p style="font-size: 14px; line-height: 1.6;" id="factText">
+                种子是植物生命的开始，在适宜的温度、水分和空气条件下会萌发。
+            </p>
+        </div>
+
+        <button class="btn-kid" onclick="resetScene()" style="width: 100%; margin-top: 16px;">🔄 重置</button>
+    </aside>
+
+    <script>
+        let scene, camera, renderer, plant;
+        let growthStage = 0;
+        let plantHealth = 1.0;
+
+        const stageFacts = [
+            '种子是植物生命的开始，在适宜的温度、水分和空气条件下会萌发。',
+            '胚根首先突破种皮，向下生长形成根系，吸收土壤中的水分和养分。',
+            '胚芽向上生长，展开子叶进行光合作用，植物开始快速生长。',
+            '植物成熟后开花，花朵通过颜色和气味吸引昆虫帮助传粉。',
+            '传粉后花朵凋谢，子房发育成果实，种子成熟后又开始新的生命周期。'
+        ];
+
+        function init() {
+            const container = document.getElementById('canvas-container');
+            scene = new THREE.Scene();
+            camera = new THREE.PerspectiveCamera(60, window.innerWidth / window.innerHeight, 0.1, 1000);
+            camera.position.set(-2.5, 6, 12);
+            camera.lookAt(0, 2, 0);
+            renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
+            renderer.setSize(window.innerWidth, window.innerHeight);
+            container.appendChild(renderer.domElement);
+
+            const ambientLight = new THREE.AmbientLight(0xffffff, 0.6);
+            scene.add(ambientLight);
+            const directionalLight = new THREE.DirectionalLight(0xffffff, 0.8);
+            directionalLight.position.set(10, 20, 10);
+            scene.add(directionalLight);
+
+            createPlant();
+            createGround();
+            window.addEventListener('resize', onWindowResize);
+            animate();
+        }
+
+        function createGround() {
+            // 土壤
+            const groundGeometry = new THREE.BoxGeometry(20, 1, 10);
+            const groundMaterial = new THREE.MeshStandardMaterial({ color: 0x8B4513 });
+            const ground = new THREE.Mesh(groundGeometry, groundMaterial);
+            ground.position.y = -0.5;
+            scene.add(ground);
+
+            // 草地
+            const grassGeometry = new THREE.BoxGeometry(20, 0.1, 10);
+            const grassMaterial = new THREE.MeshStandardMaterial({ color: 0x228B22 });
+            const grass = new THREE.Mesh(grassGeometry, grassMaterial);
+            grass.position.y = 0;
+            scene.add(grass);
+        }
+
+        function createPlant() {
+            if (plant) scene.remove(plant);
+            plant = new THREE.Group();
+
+            const health = plantHealth;
+            const stage = growthStage;
+
+            // 种子阶段
+            if (stage < 1) {
+                const seedGeometry = new THREE.SphereGeometry(0.3 * health, 16, 16);
+                const seedMaterial = new THREE.MeshStandardMaterial({ color: 0xD2691E });
+                const seed = new THREE.Mesh(seedGeometry, seedMaterial);
+                seed.position.y = 0.3;
+                seed.scale.y = 0.6;
+                plant.add(seed);
+            }
+
+            // 发芽阶段
+            if (stage >= 1) {
+                // 根
+                const rootGeometry = new THREE.CylinderGeometry(0.1, 0.05, 1.5 * health, 8);
+                const rootMaterial = new THREE.MeshStandardMaterial({ color: 0xDEB887 });
+                const root = new THREE.Mesh(rootGeometry, rootMaterial);
+                root.position.y = -0.75;
+                plant.add(root);
+
+                // 茎
+                const stemGeometry = new THREE.CylinderGeometry(0.05, 0.08, 1 * health, 8);
+                const stemMaterial = new THREE.MeshStandardMaterial({ color: 0x228B22 });
+                const stem = new THREE.Mesh(stemGeometry, stemMaterial);
+                stem.position.y = 0.5;
+                plant.add(stem);
+
+                // 子叶
+                const leafGeometry = new THREE.SphereGeometry(0.3 * health, 8, 8);
+                const leafMaterial = new THREE.MeshStandardMaterial({ color: 0x32CD32 });
+                const leaf1 = new THREE.Mesh(leafGeometry, leafMaterial);
+                leaf1.position.set(-0.2, 1.2, 0);
+                leaf1.scale.set(1, 0.3, 0.5);
+                plant.add(leaf1);
+
+                const leaf2 = new THREE.Mesh(leafGeometry, leafMaterial);
+                leaf2.position.set(0.2, 1.2, 0);
+                leaf2.scale.set(1, 0.3, 0.5);
+                plant.add(leaf2);
+            }
+
+            // 生长阶段
+            if (stage >= 2) {
+                const growFactor = (stage - 1) * health;
+
+                // 更长的茎
+                const stemGeometry = new THREE.CylinderGeometry(0.05, 0.1, 2 + growFactor * 2, 8);
+                const stemMaterial = new THREE.MeshStandardMaterial({ color: 0x228B22 });
+                const stem = new THREE.Mesh(stemGeometry, stemMaterial);
+                stem.position.y = 1 + growFactor;
+                plant.add(stem);
+
+                // 更多叶子
+                for (let i = 0; i < 3 + growFactor * 2; i++) {
+                    const leafGeometry = new THREE.SphereGeometry(0.4 * health, 8, 8);
+                    const leafMaterial = new THREE.MeshStandardMaterial({
+                        color: new THREE.Color().setHSL(0.3, 0.7, 0.4 + i * 0.05)
+                    });
+                    const leaf = new THREE.Mesh(leafGeometry, leafMaterial);
+                    const angle = (i / (3 + growFactor * 2)) * Math.PI * 2;
+                    leaf.position.set(
+                        Math.cos(angle) * (0.5 + growFactor * 0.3),
+                        0.5 + i * 0.5 * (1 + growFactor),
+                        Math.sin(angle) * (0.5 + growFactor * 0.3)
+                    );
+                    leaf.scale.set(1, 0.3, 0.5);
+                    plant.add(leaf);
+                }
+            }
+
+            // 开花阶段
+            if (stage >= 3) {
+                const flowerFactor = (stage - 2) * health;
+
+                // 花瓣
+                const petalGeometry = new THREE.SphereGeometry(0.3 * health, 8, 8);
+                const petalMaterial = new THREE.MeshStandardMaterial({ color: 0xFF69B4 });
+
+                for (let i = 0; i < 5; i++) {
+                    const petal = new THREE.Mesh(petalGeometry, petalMaterial);
+                    const angle = (i / 5) * Math.PI * 2;
+                    petal.position.set(
+                        Math.cos(angle) * 0.3 * flowerFactor,
+                        3 + flowerFactor,
+                        Math.sin(angle) * 0.3 * flowerFactor
+                    );
+                    petal.scale.set(1, 0.5, 1);
+                    plant.add(petal);
+                }
+
+                // 花蕊
+                const centerGeometry = new THREE.SphereGeometry(0.15 * health, 8, 8);
+                const centerMaterial = new THREE.MeshStandardMaterial({ color: 0xFFD700 });
+                const center = new THREE.Mesh(centerGeometry, centerMaterial);
+                center.position.y = 3 + flowerFactor;
+                plant.add(center);
+            }
+
+            // 结果阶段
+            if (stage >= 4) {
+                // 果实
+                const fruitGeometry = new THREE.SphereGeometry(0.4 * health, 16, 16);
+                const fruitMaterial = new THREE.MeshStandardMaterial({ color: 0xFF6347 });
+                const fruit = new THREE.Mesh(fruitGeometry, fruitMaterial);
+                fruit.position.y = 3;
+                plant.add(fruit);
+            }
+
+            scene.add(plant);
+        }
+
+        function updateGrowth() {
+            growthStage = parseFloat(document.getElementById('growthStage').value);
+            const stageIndex = Math.min(Math.floor(growthStage), 4);
+
+            // 更新阶段文字
+            const stages = ['种子', '发芽', '生长', '开花', '结果'];
+            document.getElementById('stageText').textContent = stages[stageIndex];
+            document.getElementById('factText').textContent = stageFacts[stageIndex];
+
+            // 更新进度点
+            for (let i = 0; i <= 4; i++) {
+                const dot = document.getElementById(`dot${i}`);
+                if (i <= stageIndex) {
+                    dot.classList.add('active');
+                } else {
+                    dot.classList.remove('active');
+                }
+            }
+
+            createPlant();
+        }
+
+        function updatePlantHealth() {
+            const water = parseInt(document.getElementById('water').value);
+            const sunlight = parseInt(document.getElementById('sunlight').value);
+
+            document.getElementById('waterText').textContent = water;
+            document.getElementById('sunText').textContent = sunlight;
+
+            // 计算植物健康度
+            const optimalWater = 50;
+            const optimalSun = 50;
+            const waterDiff = Math.abs(water - optimalWater) / optimalWater;
+            const sunDiff = Math.abs(sunlight - optimalSun) / optimalSun;
+            plantHealth = 1 - (waterDiff + sunDiff) / 2;
+            plantHealth = Math.max(0.3, Math.min(1.0, plantHealth));
+
+            createPlant();
+        }
+
+        function resetScene() {
+            document.getElementById('growthStage').value = 0;
+            document.getElementById('water').value = 50;
+            document.getElementById('sunlight').value = 50;
+            growthStage = 0;
+            plantHealth = 1.0;
+            updateGrowth();
+            updatePlantHealth();
+        }
+
+        function playGrowthAnimation() {
+            let currentStage = 0;
+            const targetStage = 4;
+            const duration = 8000; // 8秒完成整个生长过程
+            const startTime = Date.now();
+            const startStage = growthStage;
+
+            const animateGrowth = () => {
+                const elapsed = Date.now() - startTime;
+                const progress = Math.min(elapsed / duration, 1);
+
+                // 使用缓动函数使动画更自然
+                const easedProgress = progress < 0.5
+                    ? 2 * progress * progress
+                    : 1 - Math.pow(-2 * progress + 2, 2) / 2;
+
+                growthStage = startStage + (targetStage - startStage) * easedProgress;
+                document.getElementById('growthStage').value = growthStage;
+                updateGrowth();
+
+                if (progress < 1) {
+                    requestAnimationFrame(animateGrowth);
+                }
+            };
+
+            animateGrowth();
+        }
+
+        function toggleControls() {
+            document.getElementById('controls').classList.toggle('active');
+        }
+
+        let isStaticMode = false;
+
+        function toggleStaticMode() {
+            isStaticMode = !isStaticMode;
+            const staticContainer = document.getElementById('static-container');
+            const canvasContainer = document.getElementById('canvas-container');
+
+            if (isStaticMode) {
+                staticContainer.classList.add('active');
+                canvasContainer.style.display = 'none';
+            } else {
+                staticContainer.classList.remove('active');
+                canvasContainer.style.display = 'block';
+            }
+        }
+
+        function onWindowResize() {
+            camera.aspect = window.innerWidth / window.innerHeight;
+            camera.updateProjectionMatrix();
+            renderer.setSize(window.innerWidth, window.innerHeight);
+        }
+
+        function animate() {
+            requestAnimationFrame(animate);
+            if (plant) {
+                plant.rotation.y += 0.002;
+            }
+            renderer.render(scene, camera);
+        }
+
+        document.addEventListener('DOMContentLoaded', init);
+    </script>
+</body>
+</html>

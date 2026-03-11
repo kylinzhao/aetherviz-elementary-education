@@ -1,0 +1,361 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>教学系统演示 - 问答与任务</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        :root {
+            --primary-gradient: linear-gradient(135deg, #F59E0B 0%, #EAB308 100%);
+            --bg-gradient: linear-gradient(180deg, #0F172A 0%, #164E63 50%, #155E75 100%);
+        }
+
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+
+        body {
+            font-family: 'Inter', sans-serif;
+            background: var(--bg-gradient);
+            color: #F8FAFC;
+            font-size: 18px;
+            min-height: 100vh;
+        }
+
+        .demo-container {
+            display: flex;
+            gap: 24px;
+            padding: 80px 24px 24px;
+            min-height: 100vh;
+        }
+
+        .main-content {
+            flex: 1;
+            max-width: 800px;
+        }
+
+        .sidebar {
+            width: 400px;
+        }
+
+        .demo-section {
+            background: rgba(255, 255, 255, 0.05);
+            border-radius: 20px;
+            padding: 32px;
+            margin-bottom: 24px;
+        }
+
+        .demo-title {
+            font-size: 32px;
+            font-weight: bold;
+            background: var(--primary-gradient);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            margin-bottom: 16px;
+        }
+
+        .demo-description {
+            font-size: 16px;
+            color: #CBD5E1;
+            line-height: 1.6;
+            margin-bottom: 24px;
+        }
+
+        .demo-features {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 16px;
+            margin-bottom: 24px;
+        }
+
+        .feature-item {
+            background: rgba(255, 255, 255, 0.05);
+            padding: 16px;
+            border-radius: 12px;
+            border-left: 4px solid #FBBF24;
+        }
+
+        .feature-title {
+            font-weight: bold;
+            margin-bottom: 8px;
+            color: #FBBF24;
+        }
+
+        .feature-desc {
+            font-size: 14px;
+            color: #CBD5E1;
+        }
+
+        .code-block {
+            background: rgba(0, 0, 0, 0.3);
+            border-radius: 12px;
+            padding: 16px;
+            font-family: 'Courier New', monospace;
+            font-size: 14px;
+            overflow-x: auto;
+            margin-top: 16px;
+        }
+
+        .btn-demo {
+            padding: 12px 24px;
+            font-size: 16px;
+            border-radius: 12px;
+            border: none;
+            background: var(--primary-gradient);
+            color: white;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            margin-right: 12px;
+            margin-bottom: 12px;
+        }
+
+        .btn-demo:hover {
+            transform: scale(1.05);
+        }
+
+        @media (max-width: 1024px) {
+            .demo-container {
+                flex-direction: column;
+            }
+            .sidebar {
+                width: 100%;
+            }
+        }
+    </style>
+</head>
+<body>
+    <!-- 导航栏 -->
+    <nav style="position: fixed; top: 0; left: 0; right: 0; height: 70px; background: rgba(15, 23, 42, 0.85); backdrop-filter: blur(10px); border-bottom: 2px solid rgba(245, 158, 11, 0.3); display: flex; align-items: center; justify-content: space-between; padding: 0 24px; z-index: 100;">
+        <div style="display: flex; align-items: center; gap: 16px;">
+            <button class="btn-demo" onclick="window.location.href='../'">
+                🏠 返回首页
+            </button>
+            <div style="font-size: 32px; font-weight: bold; background: var(--primary-gradient); -webkit-background-clip: text; -webkit-text-fill-color: transparent;">
+                🎓 教学系统演示
+            </div>
+        </div>
+    </nav>
+
+    <div class="demo-container">
+        <div class="main-content">
+            <!-- 问答系统介绍 -->
+            <div class="demo-section">
+                <div class="demo-title">❓ 问答互动系统</div>
+                <div class="demo-description">
+                    一个通用的问答系统模块，支持选择题、判断题等多种题型，提供即时反馈和连胜记录。
+                </div>
+
+                <div class="demo-features">
+                    <div class="feature-item">
+                        <div class="feature-title">📝 多种题型</div>
+                        <div class="feature-desc">支持选择题、判断题、填空题</div>
+                    </div>
+                    <div class="feature-item">
+                        <div class="feature-title">⚡ 即时反馈</div>
+                        <div class="feature-desc">正确/错误的动画反馈</div>
+                    </div>
+                    <div class="feature-item">
+                        <div class="feature-title">🔥 连胜记录</div>
+                        <div class="feature-desc">追踪连续答对题数</div>
+                    </div>
+                    <div class="feature-item">
+                        <div class="feature-title">🎉 表扬效果</div>
+                        <div class="feature-desc">3题以上触发庆祝动画</div>
+                    </div>
+                </div>
+
+                <div style="margin-bottom: 24px;">
+                    <button class="btn-demo" onclick="loadSquareQuiz()">
+                        正方形测验
+                    </button>
+                    <button class="btn-demo" onclick="loadTriangleQuiz()">
+                        三角形测验
+                    </button>
+                    <button class="btn-demo" onclick="loadClockQuiz()">
+                        时钟测验
+                    </button>
+                </div>
+
+                <div class="code-block">
+<strong>使用示例：</strong>
+window.quizSystem = new QuizSystem({
+    lessonId: 'lesson-square',
+    container: document.getElementById('quiz-container'),
+    onAnswer: (result) => {
+        console.log('答题结果:', result);
+    }
+});
+                </div>
+            </div>
+
+            <!-- 任务系统介绍 -->
+            <div class="demo-section">
+                <div class="demo-title">📋 探索式学习任务系统</div>
+                <div class="demo-description">
+                    任务引导系统，帮助学生通过探索式学习掌握知识，提供渐进式提示和完成检测。
+                </div>
+
+                <div class="demo-features">
+                    <div class="feature-item">
+                        <div class="feature-title">🎯 任务目标</div>
+                        <div class="feature-desc">清晰的任务目标说明</div>
+                    </div>
+                    <div class="feature-item">
+                        <div class="feature-title">💡 渐进提示</div>
+                        <div class="feature-desc">3级提示从简单到详细</div>
+                    </div>
+                    <div class="feature-item">
+                        <div class="feature-title">⏰ 智能触发</div>
+                        <div class="feature-desc">1分钟无进展自动提示</div>
+                    </div>
+                    <div class="feature-item">
+                        <div class="feature-title">✅ 完成祝贺</div>
+                        <div class="feature-desc">任务完成庆祝动画</div>
+                    </div>
+                </div>
+
+                <div style="margin-bottom: 24px;">
+                    <button class="btn-demo" onclick="loadSquareTask()">
+                        正方形任务
+                    </button>
+                    <button class="btn-demo" onclick="loadTriangleTask()">
+                        三角形任务
+                    </button>
+                    <button class="btn-demo" onclick="loadClockTask()">
+                        时钟任务
+                    </button>
+                </div>
+
+                <div class="code-block">
+<strong>使用示例：</strong>
+window.taskSystem = new TaskSystem({
+    lessonId: 'lesson-square',
+    container: document.getElementById('task-container'),
+    onTaskComplete: () => {
+        console.log('任务完成！');
+    }
+});
+                </div>
+            </div>
+        </div>
+
+        <div class="sidebar">
+            <!-- 问答演示区域 -->
+            <div id="quiz-demo" style="background: rgba(255, 255, 255, 0.05); border-radius: 20px; padding: 24px; margin-bottom: 24px;">
+                <div style="font-size: 20px; font-weight: bold; margin-bottom: 16px; color: #FBBF24;">
+                    📝 问答演示
+                </div>
+                <div id="quiz-container"></div>
+            </div>
+
+            <!-- 任务演示区域 -->
+            <div style="background: rgba(255, 255, 255, 0.05); border-radius: 20px; padding: 24px;">
+                <div style="font-size: 20px; font-weight: bold; margin-bottom: 16px; color: #FBBF24;">
+                    📋 任务演示
+                </div>
+                <div id="task-container"></div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 加载模块 -->
+    <script src="quiz-system.js"></script>
+    <script src="task-system.js"></script>
+
+    <script>
+        // 问答系统演示函数
+        function loadSquareQuiz() {
+            if (window.quizSystem) {
+                window.quizSystem = null;
+            }
+            window.quizSystem = new QuizSystem({
+                lessonId: 'lesson-square',
+                container: document.getElementById('quiz-container'),
+                onAnswer: (result) => {
+                    console.log('答题结果:', result);
+                }
+            });
+        }
+
+        function loadTriangleQuiz() {
+            if (window.quizSystem) {
+                window.quizSystem = null;
+            }
+            window.quizSystem = new QuizSystem({
+                lessonId: 'lesson-triangle',
+                container: document.getElementById('quiz-container'),
+                onAnswer: (result) => {
+                    console.log('答题结果:', result);
+                }
+            });
+        }
+
+        function loadClockQuiz() {
+            if (window.quizSystem) {
+                window.quizSystem = null;
+            }
+            window.quizSystem = new QuizSystem({
+                lessonId: 'lesson-clock',
+                container: document.getElementById('quiz-container'),
+                onAnswer: (result) => {
+                    console.log('答题结果:', result);
+                }
+            });
+        }
+
+        // 任务系统演示函数
+        function loadSquareTask() {
+            if (window.taskSystem) {
+                window.taskSystem.destroy();
+            }
+            window.taskSystem = new TaskSystem({
+                lessonId: 'lesson-square',
+                container: document.getElementById('task-container'),
+                onTaskComplete: () => {
+                    console.log('任务完成！');
+                },
+                onGoalComplete: (goalId) => {
+                    console.log('目标完成:', goalId);
+                }
+            });
+        }
+
+        function loadTriangleTask() {
+            if (window.taskSystem) {
+                window.taskSystem.destroy();
+            }
+            window.taskSystem = new TaskSystem({
+                lessonId: 'lesson-triangle',
+                container: document.getElementById('task-container'),
+                onTaskComplete: () => {
+                    console.log('任务完成！');
+                },
+                onGoalComplete: (goalId) => {
+                    console.log('目标完成:', goalId);
+                }
+            });
+        }
+
+        function loadClockTask() {
+            if (window.taskSystem) {
+                window.taskSystem.destroy();
+            }
+            window.taskSystem = new TaskSystem({
+                lessonId: 'lesson-clock',
+                container: document.getElementById('task-container'),
+                onTaskComplete: () => {
+                    console.log('任务完成！');
+                },
+                onGoalComplete: (goalId) => {
+                    console.log('目标完成:', goalId);
+                }
+            });
+        }
+
+        // 页面加载完成后默认加载正方形演示
+        document.addEventListener('DOMContentLoaded', () => {
+            loadSquareQuiz();
+            loadSquareTask();
+        });
+    </script>
+</body>
+</html>

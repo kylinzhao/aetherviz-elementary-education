@@ -1,0 +1,302 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>无障碍功能演示 - AetherViz</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="accessibility.js"></script>
+    <style>
+        body {
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+            background: linear-gradient(180deg, #0F172A 0%, #1E1B4B 50%, #1E293B 100%);
+            color: #F8FAFC;
+            padding: 20px;
+            line-height: 1.6;
+        }
+
+        .demo-card {
+            background: rgba(59, 130, 246, 0.1);
+            border: 2px solid rgba(139, 92, 246, 0.3);
+            border-radius: 16px;
+            padding: 24px;
+            margin-bottom: 24px;
+        }
+
+        .demo-card h2 {
+            color: #22D3EE;
+            margin-bottom: 16px;
+        }
+
+        .btn-demo {
+            padding: 12px 24px;
+            border-radius: 8px;
+            border: none;
+            background: linear-gradient(135deg, #3B82F6 0%, #8B5CF6 100%);
+            color: white;
+            cursor: pointer;
+            font-size: 16px;
+            margin: 8px;
+        }
+
+        .btn-demo:hover {
+            transform: scale(1.05);
+        }
+
+        .keyboard-hint {
+            background: rgba(0, 0, 0, 0.3);
+            padding: 4px 8px;
+            border-radius: 4px;
+            font-family: monospace;
+            font-size: 14px;
+        }
+
+        .status-indicator {
+            display: inline-block;
+            width: 12px;
+            height: 12px;
+            border-radius: 50%;
+            margin-right: 8px;
+        }
+
+        .status-on {
+            background: #22C55E;
+        }
+
+        .status-off {
+            background: #64748B;
+        }
+    </style>
+</head>
+<body>
+    <!-- 跳过链接 -->
+    <div id="skip-links">
+        <a href="#main-content" class="skip-link">跳到主内容</a>
+    </div>
+
+    <nav role="navigation" aria-label="主导航">
+        <button class="btn-demo" onclick="toggleAccessibility()" aria-label="打开无障碍设置">
+            打开无障碍设置
+        </button>
+    </nav>
+
+    <main id="main-content" role="main">
+        <h1>无障碍功能演示</h1>
+        <p>这个页面演示了所有已实现的无障碍功能。</p>
+
+        <!-- 当前设置 -->
+        <section class="demo-card" aria-labelledby="settings-title">
+            <h2 id="settings-title">当前设置</h2>
+            <div id="current-settings" role="region" aria-live="polite">
+                <p><span class="status-indicator" id="contrast-indicator"></span>高对比度: <span id="contrast-status">关闭</span></p>
+                <p><span class="status-indicator" id="motion-indicator"></span>减少动画: <span id="motion-status">关闭</span></p>
+                <p>文字大小: <span id="font-status">100%</span></p>
+            </div>
+        </section>
+
+        <!-- 高对比度 -->
+        <section class="demo-card" aria-labelledby="contrast-title">
+            <h2 id="contrast-title">1. 高对比度模式</h2>
+            <p>提供最大可读性的配色方案，对比度超过 WCAG AAA 标准。</p>
+            <p>快捷键: <span class="keyboard-hint">Alt + H</span></p>
+            <button class="btn-demo" onclick="toggleContrast()" aria-label="切换高对比度模式">
+                切换高对比度
+            </button>
+            <div aria-live="polite" id="contrast-demo" style="margin-top: 16px;">
+                <div style="background: #000; color: #FFF; padding: 12px; margin: 8px 0; border-radius: 8px;">
+                    黑底白字示例
+                </div>
+                <div style="background: #FFF; color: #000; padding: 12px; margin: 8px 0; border-radius: 8px;">
+                    白底黑字示例
+                </div>
+            </div>
+        </section>
+
+        <!-- 文字大小 -->
+        <section class="demo-card" aria-labelledby="font-title">
+            <h2 id="font-title">2. 文字大小调节</h2>
+            <p>在 100%-200% 范围内调节文字大小，布局不会被破坏。</p>
+            <p>快捷键: <span class="keyboard-hint">Alt + +</span> / <span class="keyboard-hint">Alt + -</span></p>
+            <button class="btn-demo" onclick="increaseFont()" aria-label="增大文字">
+                增大文字
+            </button>
+            <button class="btn-demo" onclick="decreaseFont()" aria-label="减小文字">
+                减小文字
+            </button>
+            <button class="btn-demo" onclick="resetFont()" aria-label="重置文字">
+                重置文字
+            </button>
+            <div aria-live="polite" id="font-demo" style="margin-top: 16px; padding: 12px; background: rgba(255,255,255,0.05); border-radius: 8px;">
+                这段文字会随设置变化。当前大小: <span id="current-font">100%</span>
+            </div>
+        </section>
+
+        <!-- 减少动画 -->
+        <section class="demo-card" aria-labelledby="motion-title">
+            <h2 id="motion-title">3. 减少动画</h2>
+            <p>为前庭障碍用户提供的选项，禁用所有非必要动画。</p>
+            <p>快捷键: <span class="keyboard-hint">Alt + R</span></p>
+            <button class="btn-demo" onclick="toggleMotion()" aria-label="切换减少动画">
+                切换减少动画
+            </button>
+            <div aria-live="polite" id="motion-demo" style="margin-top: 16px;">
+                <div class="breathe" style="background: rgba(34, 211, 238, 0.2); padding: 16px; border-radius: 8px; margin: 8px 0;">
+                    呼吸动画示例（减少动画时会停止）
+                </div>
+            </div>
+        </section>
+
+        <!-- 键盘导航 -->
+        <section class="demo-card" aria-labelledby="keyboard-title">
+            <h2 id="keyboard-title">4. 键盘导航</h2>
+            <p>所有功能都可以仅使用键盘完成。</p>
+            <ul style="list-style: none; padding: 0;">
+                <li><span class="keyboard-hint">Tab</span> - 下一个元素</li>
+                <li><span class="keyboard-hint">Shift + Tab</span> - 上一个元素</li>
+                <li><span class="keyboard-hint">Enter</span> / <span class="keyboard-hint">Space</span> - 激活按钮</li>
+                <li><span class="keyboard-hint">Escape</span> - 关闭面板</li>
+                <li><span class="keyboard-hint">方向键</span> - 调节滑块</li>
+            </ul>
+            <div style="margin-top: 16px;">
+                <label for="demo-slider" style="display: block; margin-bottom: 8px;">测试滑块:</label>
+                <input type="range" id="demo-slider" min="0" max="100" value="50"
+                       aria-label="测试滑块"
+                       style="width: 200px;"
+                       oninput="updateSlider(this.value)">
+                <span id="slider-value" aria-live="polite">50</span>
+            </div>
+        </section>
+
+        <!-- 屏幕阅读器 -->
+        <section class="demo-card" aria-labelledby="reader-title">
+            <h2 id="reader-title">5. 屏幕阅读器支持</h2>
+            <p>所有状态变化都会通过屏幕阅读器公告。</p>
+            <button class="btn-demo" onclick="testAnnounce()" aria-label="测试屏幕阅读器公告">
+                测试公告
+            </button>
+            <div aria-live="polite" id="announce-result" style="margin-top: 16px; padding: 12px; background: rgba(0,0,0,0.3); border-radius: 8px;">
+                点击按钮测试屏幕阅读器公告...
+            </div>
+        </section>
+
+        <!-- 对比度检查 -->
+        <section class="demo-card" aria-labelledby="contrast-check-title">
+            <h2 id="contrast-check-title">6. 对比度检查</h2>
+            <p>所有颜色组合都满足 WCAG AA 标准（对比度 ≥ 4.5:1）。</p>
+            <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 12px; margin-top: 16px;">
+                <div style="background: #000; color: #FFF; padding: 16px; border-radius: 8px;">
+                    黑底白字<br>
+                    <small>21:1 (AAA)</small>
+                </div>
+                <div style="background: #FFF; color: #000; padding: 16px; border-radius: 8px;">
+                    白底黑字<br>
+                    <small>21:1 (AAA)</small>
+                </div>
+                <div style="background: #000; color: #FFFF00; padding: 16px; border-radius: 8px;">
+                    黑底黄字<br>
+                    <small>19:1 (AAA)</small>
+                </div>
+                <div style="background: #22D3EE; color: #000; padding: 16px; border-radius: 8px;">
+                    青底黑字<br>
+                    <small>14:1 (AAA)</small>
+                </div>
+            </div>
+        </section>
+    </main>
+
+    <script>
+        // 切换高对比度
+        function toggleContrast() {
+            window.A11y.toggleHighContrast();
+            updateSettings();
+            announce('高对比度模式已' + (window.A11y.highContrastMode ? '开启' : '关闭'));
+        }
+
+        // 增大文字
+        function increaseFont() {
+            window.A11y.increaseFontSize();
+            updateSettings();
+            announce(`文字大小已增加到 ${window.A11y.fontSizeLevel}%`);
+        }
+
+        // 减小文字
+        function decreaseFont() {
+            window.A11y.decreaseFontSize();
+            updateSettings();
+            announce(`文字大小已减小到 ${window.A11y.fontSizeLevel}%`);
+        }
+
+        // 重置文字
+        function resetFont() {
+            window.A11y.resetFontSize();
+            updateSettings();
+            announce('文字大小已重置到 100%');
+        }
+
+        // 切换减少动画
+        function toggleMotion() {
+            window.A11y.toggleReducedMotion();
+            updateSettings();
+            announce('减少动画已' + (window.A11y.reducedMotion ? '开启' : '关闭'));
+        }
+
+        // 更新滑块
+        function updateSlider(value) {
+            document.getElementById('slider-value').textContent = value;
+        }
+
+        // 测试公告
+        function testAnnounce() {
+            window.A11y.announce('这是一条测试公告消息');
+            document.getElementById('announce-result').textContent = '公告已发送！请检查屏幕阅读器输出。';
+        }
+
+        // 公告辅助函数
+        function announce(message) {
+            window.A11y.announce(message);
+        }
+
+        // 更新设置显示
+        function updateSettings() {
+            const settings = window.A11y.getSettings();
+
+            // 高对比度
+            document.getElementById('contrast-status').textContent = settings.highContrastMode ? '开启' : '关闭';
+            document.getElementById('contrast-indicator').className = 'status-indicator ' + (settings.highContrastMode ? 'status-on' : 'status-off');
+
+            // 减少动画
+            document.getElementById('motion-status').textContent = settings.reducedMotion ? '开启' : '关闭';
+            document.getElementById('motion-indicator').className = 'status-indicator ' + (settings.reducedMotion ? 'status-on' : 'status-off');
+
+            // 文字大小
+            document.getElementById('font-status').textContent = settings.fontSizeLevel + '%';
+            document.getElementById('current-font').textContent = settings.fontSizeLevel + '%';
+        }
+
+        // 切换无障碍设置面板
+        function toggleAccessibility() {
+            let panel = document.getElementById('a11y-panel');
+            if (!panel) {
+                panel = window.A11y.createAccessibilityPanel();
+                document.body.appendChild(panel);
+            }
+            panel.classList.toggle('active');
+            announce('无障碍设置已' + (panel.classList.contains('active') ? '打开' : '关闭'));
+        }
+
+        // 初始化
+        document.addEventListener('DOMContentLoaded', () => {
+            updateSettings();
+
+            // 监听设置变化
+            const observer = new MutationObserver(() => {
+                updateSettings();
+            });
+            observer.observe(document.documentElement, {
+                attributes: true,
+                attributeFilter: ['style', 'class']
+            });
+        });
+    </script>
+</body>
+</html>

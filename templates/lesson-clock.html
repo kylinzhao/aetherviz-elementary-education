@@ -1,0 +1,684 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>时钟与时间 - AetherViz 小学教学</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r134/three.min.js"></script>
+    <style>
+        :root {
+            --primary-gradient: linear-gradient(135deg, #EC4899 0%, #8B5CF6 100%);
+            --bg-gradient: linear-gradient(180deg, #0F172A 0%, #701A75 50%, #581C87 100%);
+        }
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: 'Inter', sans-serif;
+            background: var(--bg-gradient);
+            color: #F8FAFC;
+            font-size: 18px;
+            overflow-x: hidden;
+        }
+        #canvas-container { position: fixed; top: 0; left: 0; width: 100%; height: 100%; z-index: 0; }
+
+        #static-container {
+            position: fixed;
+            top: 70px;
+            left: 0;
+            width: 100%;
+            height: calc(100vh - 70px);
+            display: none;
+            justify-content: center;
+            align-items: center;
+            z-index: 1;
+            background: var(--bg-gradient);
+        }
+
+        #static-container.active {
+            display: flex;
+        }
+
+        .static-diagram {
+            max-width: 90%;
+            max-height: 90%;
+            background: rgba(255, 255, 255, 0.05);
+            border-radius: 20px;
+            padding: 40px;
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+        }
+        .navbar {
+            position: fixed; top: 0; left: 0; right: 0; height: 70px;
+            background: rgba(15, 23, 42, 0.85); backdrop-filter: blur(10px);
+            border-bottom: 2px solid rgba(236, 72, 153, 0.3);
+            display: flex; align-items: center; justify-content: space-between;
+            padding: 0 24px; z-index: 100;
+        }
+        .navbar-title { font-size: 32px; font-weight: bold; background: var(--primary-gradient); -webkit-background-clip: text; -webkit-text-fill-color: transparent; }
+        .btn-kid {
+            min-width: 60px; min-height: 60px; padding: 16px 24px;
+            font-size: 18px; border-radius: 12px; border: none;
+            background: var(--primary-gradient); color: white;
+            cursor: pointer; transition: all 0.3s ease;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+        }
+        .btn-kid:hover { transform: scale(1.05); }
+        .control-panel {
+            position: fixed; right: 0; top: 70px; width: 30%;
+            height: calc(100vh - 70px); background: rgba(88, 28, 135, 0.7);
+            backdrop-filter: blur(10px); border-left: 1px solid rgba(236, 72, 153, 0.25);
+            padding: 24px; overflow-y: auto; z-index: 90;
+        }
+        .tab-buttons {
+            display: flex; gap: 8px; margin-bottom: 16px;
+        }
+        .tab-btn {
+            flex: 1; padding: 12px; border-radius: 8px;
+            border: 2px solid rgba(255, 255, 255, 0.2);
+            background: rgba(255, 255, 255, 0.1);
+            color: white; cursor: pointer; transition: all 0.3s;
+        }
+        .tab-btn.active {
+            background: var(--primary-gradient);
+            border-color: transparent;
+        }
+        input[type="range"].kid-slider {
+            -webkit-appearance: none; width: 100%; height: 12px;
+            border-radius: 6px; background: rgba(255, 255, 255, 0.2);
+            cursor: pointer;
+        }
+        input[type="range"].kid-slider::-webkit-slider-thumb {
+            -webkit-appearance: none; width: 32px; height: 32px;
+            border-radius: 50%; background: var(--primary-gradient); cursor: pointer;
+        }
+        .time-display {
+            text-align: center; padding: 20px;
+            background: rgba(255, 255, 255, 0.05);
+            border-radius: 12px; margin: 16px 0;
+        }
+        .time-value {
+            font-size: 48px; font-weight: bold;
+            background: var(--primary-gradient);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            font-family: 'Courier New', monospace;
+        }
+        .info-box {
+            padding: 16px; background: rgba(255,255,255,0.05);
+            border-radius: 12px; margin-top: 16px;
+        }
+
+        /* 移动端优化 */
+        @media (max-width: 640px) {
+            .navbar {
+                padding: 0 12px;
+                height: 56px;
+            }
+            .navbar-title {
+                font-size: 20px;
+            }
+            .btn-kid {
+                min-width: 44px;
+                min-height: 44px;
+                padding: 10px 12px;
+                font-size: 14px;
+            }
+            .control-panel {
+                width: 100%;
+                height: 50vh;
+                top: 56px;
+            }
+            body {
+                font-size: 16px;
+            }
+            .time-value {
+                font-size: 36px;
+            }
+        }
+
+        /* 平板端优化 */
+        @media (min-width: 641px) and (max-width: 1024px) {
+            .control-panel {
+                width: 40%;
+            }
+            .navbar-title {
+                font-size: 26px;
+            }
+        }
+
+        /* 触摸设备优化 */
+        @media (hover: none) and (pointer: coarse) {
+            input[type="range"].kid-slider::-webkit-slider-thumb {
+                width: 40px;
+                height: 40px;
+            }
+            .btn-kid {
+                min-height: 48px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div id="canvas-container"></div>
+
+    <!-- 任务侧边栏容器 -->
+    <div id="task-container"></div>
+
+    <!-- 静态展示容器 -->
+    <div id="static-container">
+        <div class="static-diagram">
+            <svg width="550" height="700" viewBox="0 0 550 700">
+                <!-- 标题 -->
+                <text x="275" y="40" text-anchor="middle" fill="#F8FAFC" font-size="32" font-weight="bold">
+                    时钟与时间
+                </text>
+
+                <!-- 时钟表盘 -->
+                <g transform="translate(275, 200)">
+                    <!-- 外圆 -->
+                    <circle cx="0" cy="0" r="150" fill="#FFFFFF" stroke="#8B5CF6" stroke-width="8"/>
+
+                    <!-- 数字刻度 -->
+                    <text x="0" y="-115" text-anchor="middle" fill="#000000" font-size="28" font-weight="bold">12</text>
+                    <text x="60" y="-100" text-anchor="middle" fill="#000000" font-size="28" font-weight="bold">1</text>
+                    <text x="100" y="-65" text-anchor="middle" fill="#000000" font-size="28" font-weight="bold">2</text>
+                    <text x="115" y="10" text-anchor="middle" fill="#000000" font-size="28" font-weight="bold">3</text>
+                    <text x="100" y="80" text-anchor="middle" fill="#000000" font-size="28" font-weight="bold">4</text>
+                    <text x="60" y="115" text-anchor="middle" fill="#000000" font-size="28" font-weight="bold">5</text>
+                    <text x="0" y="130" text-anchor="middle" fill="#000000" font-size="28" font-weight="bold">6</text>
+                    <text x="-60" y="115" text-anchor="middle" fill="#000000" font-size="28" font-weight="bold">7</text>
+                    <text x="-100" y="80" text-anchor="middle" fill="#000000" font-size="28" font-weight="bold">8</text>
+                    <text x="-115" y="10" text-anchor="middle" fill="#000000" font-size="28" font-weight="bold">9</text>
+                    <text x="-100" y="-65" text-anchor="middle" fill="#000000" font-size="28" font-weight="bold">10</text>
+                    <text x="-60" y="-100" text-anchor="middle" fill="#000000" font-size="28" font-weight="bold">11</text>
+
+                    <!-- 小刻度 -->
+                    <line x1="-5" y1="-140" x2="5" y2="-140" stroke="#6B7280" stroke-width="2" transform="rotate(30)"/>
+                    <line x1="-5" y1="-140" x2="5" y2="-140" stroke="#6B7280" stroke-width="2" transform="rotate(60)"/>
+                    <line x1="-5" y1="-140" x2="5" y2="-140" stroke="#6B7280" stroke-width="2" transform="rotate(120)"/>
+                    <line x1="-5" y1="-140" x2="5" y2="-140" stroke="#6B7280" stroke-width="2" transform="rotate(150)"/>
+                    <line x1="-5" y1="-140" x2="5" y2="-140" stroke="#6B7280" stroke-width="2" transform="rotate(210)"/>
+                    <line x1="-5" y1="-140" x2="5" y2="-140" stroke="#6B7280" stroke-width="2" transform="rotate(240)"/>
+                    <line x1="-5" y1="-140" x2="5" y2="-140" stroke="#6B7280" stroke-width="2" transform="rotate(300)"/>
+                    <line x1="-5" y1="-140" x2="5" y2="-140" stroke="#6B7280" stroke-width="2" transform="rotate(330)"/>
+
+                    <!-- 时针 - 8点位置 (8*30=240度) -->
+                    <rect x="-6" y="-50" width="12" height="50" fill="#000000" transform="rotate(240)"/>
+                    <text x="25" y="-60" fill="#000000" font-size="14" font-weight="bold">时针</text>
+
+                    <!-- 分针 - 6分位置 (6*6=36度) -->
+                    <rect x="-4" y="-70" width="8" height="70" fill="#000000" transform="rotate(36)"/>
+                    <text x="45" y="-15" fill="#000000" font-size="14" font-weight="bold">分针</text>
+
+                    <!-- 秒针 - 30秒位置 (30*6=180度) -->
+                    <rect x="-2" y="-80" width="4" height="80" fill="#EF4444" transform="rotate(180)"/>
+                    <text x="-75" y="5" fill="#EF4444" font-size="14" font-weight="bold">秒针</text>
+
+                    <!-- 中心点 -->
+                    <circle cx="0" cy="0" r="10" fill="#8B5CF6"/>
+                </g>
+
+                <!-- 时间显示 -->
+                <text x="275" y="400" text-anchor="middle" fill="#F8FAFC" font-size="36" font-weight="bold">
+                    8:30:30
+                </text>
+                <text x="275" y="435" text-anchor="middle" fill="#CBD5E1" font-size="18">
+                    示例时间
+                </text>
+
+                <!-- 指针说明 -->
+                <g transform="translate(50, 470)">
+                    <rect x="0" y="0" width="450" height="180" fill="rgba(255,255,255,0.1)" rx="15"/>
+
+                    <text x="225" y="35" text-anchor="middle" fill="#F8FAFC" font-size="22" font-weight="bold">
+                        指针的特点
+                    </text>
+
+                    <!-- 时针说明 -->
+                    <rect x="20" y="55" width="10" height="30" fill="#000000"/>
+                    <text x="45" y="70" fill="#F8FAFC" font-size="16" font-weight="bold">时针</text>
+                    <text x="45" y="90" fill="#CBD5E1" font-size="14">短而粗，走得最慢</text>
+                    <text x="45" y="110" fill="#CBD5E1" font-size="14">每小时走一格</text>
+
+                    <!-- 分针说明 -->
+                    <rect x="170" y="55" width="8" height="35" fill="#000000"/>
+                    <text x="195" y="70" fill="#F8FAFC" font-size="16" font-weight="bold">分针</text>
+                    <text x="195" y="90" fill="#CBD5E1" font-size="14">比时针长、细</text>
+                    <text x="195" y="110" fill="#CBD5E1" font-size="14">每分钟走一格</text>
+
+                    <!-- 秒针说明 -->
+                    <rect x="320" y="55" width="4" height="40" fill="#EF4444"/>
+                    <text x="335" y="70" fill="#F8FAFC" font-size="16" font-weight="bold">秒针</text>
+                    <text x="335" y="90" fill="#CBD5E1" font-size="14">最长、最细</text>
+                    <text x="335" y="110" fill="#CBD5E1" font-size="14">每秒走一格</text>
+
+                    <!-- 读写提示 -->
+                    <text x="20" y="145" fill="#FBBF24" font-size="15" font-weight="bold">💡 读写时间：</text>
+                    <text x="20" y="165" fill="#CBD5E1" font-size="14">先看时针定几时，再看分针定几分</text>
+                </g>
+            </svg>
+        </div>
+    </div>
+
+    <nav class="navbar">
+        <div style="display: flex; align-items: center; gap: 16px;">
+            <button class="btn-kid" onclick="window.location.href='../'">
+                🏠 返回首页
+            </button>
+            <div class="navbar-title">⏰ 时钟与时间</div>
+        </div>
+        <div style="display: flex; gap: 12px;">
+            <button class="btn-kid" onclick="toggleStaticMode()">
+                🖼️ 静态展示
+            </button>
+            <button class="btn-kid" onclick="toggleTaskSidebar()">
+                📋 探索任务
+            </button>
+            <button class="btn-kid" onclick="toggleControls()">🎮 控制</button>
+        </div>
+    </nav>
+
+    <aside class="control-panel" id="controls">
+        <h2 style="font-size: 24px; margin-bottom: 16px;">⏰ 时间工具</h2>
+
+        <div class="tab-buttons">
+            <button class="tab-btn active" onclick="switchMode('clock')">时钟</button>
+            <button class="tab-btn" onclick="switchMode('learn')">学习</button>
+            <button class="tab-btn" onclick="switchMode('quiz')">测验</button>
+        </div>
+
+        <!-- 时钟模式 -->
+        <div id="clock-controls">
+            <div class="time-display">
+                <div class="time-value" id="currentTime">08:30:00</div>
+                <div style="font-size: 16px; color: rgba(255,255,255,0.6); margin-top: 8px;">
+                    当前时间
+                </div>
+            </div>
+
+            <div style="margin-bottom: 24px;">
+                <label style="display: block; margin-bottom: 8px;">⏱️ 调整时间</label>
+                <input type="range" class="kid-slider" id="timeSlider" min="0" max="86399" value="30600" oninput="updateTimeFromSlider()">
+                <div style="margin-top: 12px; display: flex; gap: 8px;">
+                    <button class="btn-kid" onclick="adjustTime(-3600)" style="flex: 1;">-1小时</button>
+                    <button class="btn-kid" onclick="adjustTime(-60)" style="flex: 1;">-1分钟</button>
+                    <button class="btn-kid" onclick="adjustTime(60)" style="flex: 1;">+1分钟</button>
+                    <button class="btn-kid" onclick="adjustTime(3600)" style="flex: 1;">+1小时</button>
+                </div>
+            </div>
+
+            <div style="margin-bottom: 16px;">
+                <button class="btn-kid" onclick="toggleRealTime()" style="width: 100%;" id="realTimeBtn">
+                    ▶️ 显示实时时间
+                </button>
+            </div>
+        </div>
+
+        <!-- 学习模式 -->
+        <div id="learn-controls" style="display: none;">
+            <h3 style="font-size: 18px; margin-bottom: 12px;">📖 时钟知识</h3>
+
+            <div class="info-box">
+                <h4 style="font-size: 16px; margin-bottom: 8px;">时针</h4>
+                <p style="font-size: 14px; line-height: 1.6; margin-bottom: 12px;">
+                    - 最短、最粗的指针<br>
+                    - 每小时走一格（30度）<br>
+                    - 12小时转一圈
+                </p>
+            </div>
+
+            <div class="info-box">
+                <h4 style="font-size: 16px; margin-bottom: 8px;">分针</h4>
+                <p style="font-size: 14px; line-height: 1.6; margin-bottom: 12px;">
+                    - 比时针长、细<br>
+                    - 每分钟走一格（6度）<br>
+                    - 60分钟转一圈
+                </p>
+            </div>
+
+            <div class="info-box">
+                <h4 style="font-size: 16px; margin-bottom: 8px;">秒针</h4>
+                <p style="font-size: 14px; line-height: 1.6;">
+                    - 最长、最细的指针<br>
+                    - 每秒走一格（6度）<br>
+                    - 60秒转一圈
+                </p>
+            </div>
+
+            <div class="info-box" style="margin-top: 16px;">
+                <h4 style="font-size: 16px; margin-bottom: 8px;">💡 小技巧</h4>
+                <p style="font-size: 14px; line-height: 1.6;">
+                    时针在两个数字之间时，看过了哪个数字，就是几点多！
+                </p>
+            </div>
+        </div>
+
+        <!-- 测验模式 -->
+        <div id="quiz-controls" style="display: none;">
+            <div class="info-box">
+                <h3 style="font-size: 18px; margin-bottom: 12px;">❓ 现在是几点？</h3>
+                <p style="font-size: 16px; margin-bottom: 16px;" id="quizQuestion">
+                    看时钟，说出现在是几点？
+                </p>
+                <div id="quizOptions" style="display: flex; flex-direction: column; gap: 8px;">
+                    <button class="btn-kid quiz-opt" onclick="checkAnswer(0)">8:30</button>
+                    <button class="btn-kid quiz-opt" onclick="checkAnswer(1)">9:30</button>
+                    <button class="btn-kid quiz-opt" onclick="checkAnswer(2)">8:25</button>
+                </div>
+                <div id="quizResult" style="font-size: 14px; margin-top: 12px;"></div>
+            </div>
+
+            <button class="btn-kid" onclick="newQuiz()" style="width: 100%; margin-top: 16px;">
+                🔄 出新题
+            </button>
+        </div>
+
+        <div style="margin-top: 24px; padding: 16px; background: rgba(255,255,255,0.05); border-radius: 12px;">
+            <h3 style="font-size: 18px; margin-bottom: 12px;">❓ 问答测试</h3>
+            <div id="quiz-container"></div>
+        </div>
+    </aside>
+
+    <!-- 加载问答和任务系统模块 -->
+    <script src="../modules/quiz-system.js"></script>
+    <script src="../modules/task-system.js"></script>
+
+    <script>
+        let scene, camera, renderer, clock;
+        let hours = 8, minutes = 30, seconds = 0;
+        let isRealTime = false;
+        let currentMode = 'clock';
+
+        function init() {
+            const container = document.getElementById('canvas-container');
+            scene = new THREE.Scene();
+            camera = new THREE.PerspectiveCamera(60, window.innerWidth / window.innerHeight, 0.1, 1000);
+            camera.position.set(-2.5, 0, 8);
+            camera.lookAt(0, 0, 0);
+            renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
+            renderer.setSize(window.innerWidth, window.innerHeight);
+            container.appendChild(renderer.domElement);
+
+            const ambientLight = new THREE.AmbientLight(0xffffff, 0.6);
+            scene.add(ambientLight);
+            const directionalLight = new THREE.DirectionalLight(0xffffff, 0.8);
+            directionalLight.position.set(10, 10, 10);
+            scene.add(directionalLight);
+
+            createClock();
+            window.addEventListener('resize', onWindowResize);
+            animate();
+        }
+
+        function createClock() {
+            if (clock) scene.remove(clock);
+            clock = new THREE.Group();
+
+            // 表盘
+            const faceGeometry = new THREE.CylinderGeometry(3, 3, 0.3, 64);
+            const faceMaterial = new THREE.MeshStandardMaterial({ color: 0xFFFFFF });
+            const face = new THREE.Mesh(faceGeometry, faceMaterial);
+            face.rotation.x = Math.PI / 2;
+            clock.add(face);
+
+            // 表盘边框
+            const rimGeometry = new THREE.TorusGeometry(3, 0.2, 32);
+            const rimMaterial = new THREE.MeshStandardMaterial({ color: 0x8B5CF6 });
+            const rim = new THREE.Mesh(rimGeometry, rimMaterial);
+            clock.add(rim);
+
+            // 数字刻度
+            const numberMaterial = new THREE.MeshStandardMaterial({ color: 0x000000 });
+            for (let i = 1; i <= 12; i++) {
+                const angle = (i - 3) * Math.PI / 6;
+                const radius = 2.2;
+
+                const numberGeometry = new THREE.BoxGeometry(0.4, 0.4, 0.1);
+                const number = new THREE.Mesh(numberGeometry, numberMaterial);
+                number.position.set(
+                    Math.cos(angle) * radius,
+                    0.2,
+                    Math.sin(angle) * radius
+                );
+                clock.add(number);
+            }
+
+            // 小刻度
+            for (let i = 0; i < 60; i++) {
+                if (i % 5 === 0) continue;
+                const angle = i * Math.PI / 30;
+                const tickGeometry = new THREE.BoxGeometry(0.1, 0.2, 0.05);
+                const tickMaterial = new THREE.MeshStandardMaterial({ color: 0x6B7280 });
+                const tick = new THREE.Mesh(tickGeometry, tickMaterial);
+                tick.position.set(
+                    Math.cos(angle) * 2.6,
+                    0.15,
+                    Math.sin(angle) * 2.6
+                );
+                tick.lookAt(0, 0.15, 0);
+                clock.add(tick);
+            }
+
+            // 时针
+            const hourGeometry = new THREE.BoxGeometry(0.2, 1.5, 0.1);
+            const hourMaterial = new THREE.MeshStandardMaterial({ color: 0x000000 });
+            const hourHand = new THREE.Mesh(hourGeometry, hourMaterial);
+            hourHand.position.y = 0.3;
+            hourHand.rotation.y = -(hours % 12 + minutes / 60) * Math.PI / 6;
+            clock.add(hourHand);
+            clock.userData.hourHand = hourHand;
+
+            // 分针
+            const minuteGeometry = new THREE.BoxGeometry(0.15, 2.2, 0.08);
+            const minuteMaterial = new THREE.MeshStandardMaterial({ color: 0x000000 });
+            const minuteHand = new THREE.Mesh(minuteGeometry, minuteMaterial);
+            minuteHand.position.y = 0.3;
+            minuteHand.rotation.y = -minutes * Math.PI / 30;
+            clock.add(minuteHand);
+            clock.userData.minuteHand = minuteHand;
+
+            // 秒针
+            const secondGeometry = new THREE.BoxGeometry(0.08, 2.5, 0.05);
+            const secondMaterial = new THREE.MeshStandardMaterial({ color: 0xEF4444 });
+            const secondHand = new THREE.Mesh(secondGeometry, secondMaterial);
+            secondHand.position.y = 0.3;
+            secondHand.rotation.y = -seconds * Math.PI / 30;
+            clock.add(secondHand);
+            clock.userData.secondHand = secondHand;
+
+            // 中心点
+            const centerGeometry = new THREE.CylinderGeometry(0.15, 0.15, 0.4, 16);
+            const centerMaterial = new THREE.MeshStandardMaterial({ color: 0x8B5CF6 });
+            const center = new THREE.Mesh(centerGeometry, centerMaterial);
+            center.rotation.x = Math.PI / 2;
+            clock.add(center);
+
+            scene.add(clock);
+        }
+
+        function updateTimeFromSlider() {
+            if (isRealTime) return;
+
+            const totalSeconds = parseInt(document.getElementById('timeSlider').value);
+            hours = Math.floor(totalSeconds / 3600);
+            minutes = Math.floor((totalSeconds % 3600) / 60);
+            seconds = totalSeconds % 60;
+
+            updateTime();
+        }
+
+        function adjustTime(delta) {
+            if (isRealTime) {
+                isRealTime = false;
+                document.getElementById('realTimeBtn').textContent = '▶️ 显示实时时间';
+            }
+
+            let totalSeconds = hours * 3600 + minutes * 60 + seconds + delta;
+            if (totalSeconds < 0) totalSeconds += 86400;
+            if (totalSeconds >= 86400) totalSeconds -= 86400;
+
+            hours = Math.floor(totalSeconds / 3600);
+            minutes = Math.floor((totalSeconds % 3600) / 60);
+            seconds = totalSeconds % 60;
+
+            document.getElementById('timeSlider').value = totalSeconds;
+            updateTime();
+        }
+
+        function updateTime() {
+            const timeString = `${String(hours).padStart(2, '0')}:${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`;
+            document.getElementById('currentTime').textContent = timeString;
+
+            // 更新指针位置
+            if (clock && clock.userData) {
+                clock.userData.hourHand.rotation.y = -(hours % 12 + minutes / 60) * Math.PI / 6;
+                clock.userData.minuteHand.rotation.y = -minutes * Math.PI / 30;
+                clock.userData.secondHand.rotation.y = -seconds * Math.PI / 30;
+            }
+        }
+
+        function toggleRealTime() {
+            isRealTime = !isRealTime;
+            const btn = document.getElementById('realTimeBtn');
+
+            if (isRealTime) {
+                btn.textContent = '⏸️ 暂停实时时间';
+            } else {
+                btn.textContent = '▶️ 显示实时时间';
+            }
+        }
+
+        function switchMode(mode) {
+            currentMode = mode;
+
+            document.querySelectorAll('.tab-btn').forEach(btn => btn.classList.remove('active'));
+            event.target.classList.add('active');
+
+            document.getElementById('clock-controls').style.display = 'none';
+            document.getElementById('learn-controls').style.display = 'none';
+            document.getElementById('quiz-controls').style.display = 'none';
+
+            if (mode === 'clock') {
+                document.getElementById('clock-controls').style.display = 'block';
+            } else if (mode === 'learn') {
+                document.getElementById('learn-controls').style.display = 'block';
+            } else if (mode === 'quiz') {
+                document.getElementById('quiz-controls').style.display = 'block';
+                newQuiz();
+            }
+        }
+
+        function newQuiz() {
+            // 生成随机时间
+            hours = Math.floor(Math.random() * 12) + 1;
+            minutes = Math.floor(Math.random() * 12) * 5;
+            seconds = 0;
+
+            updateTime();
+
+            // 生成选项
+            const correctAnswer = 0;
+            const wrong1 = (hours + 1) % 12 + ':' + String(minutes).padStart(2, '0');
+            const wrong2 = hours + ':' + String(minutes + 5).padStart(2, '0');
+
+            document.getElementById('quizOptions').innerHTML = `
+                <button class="btn-kid quiz-opt" onclick="checkAnswer(0)">${hours}:${String(minutes).padStart(2, '0')}</button>
+                <button class="btn-kid quiz-opt" onclick="checkAnswer(1)">${wrong1}</button>
+                <button class="btn-kid quiz-opt" onclick="checkAnswer(2)">${wrong2}</button>
+            `;
+
+            document.getElementById('quizResult').textContent = '';
+        }
+
+        function checkAnswer(answer) {
+            const result = document.getElementById('quizResult');
+            if (answer === 0) {
+                result.textContent = '✅ 正确！太棒了！';
+                result.style.color = '#22C55E';
+            } else {
+                result.textContent = '❌ 不对哦，再仔细看看！';
+                result.style.color = '#EF4444';
+            }
+        }
+
+        let isStaticMode = false;
+
+        function toggleStaticMode() {
+            isStaticMode = !isStaticMode;
+            const staticContainer = document.getElementById('static-container');
+            const canvasContainer = document.getElementById('canvas-container');
+
+            if (isStaticMode) {
+                staticContainer.classList.add('active');
+                canvasContainer.style.display = 'none';
+            } else {
+                staticContainer.classList.remove('active');
+                canvasContainer.style.display = 'block';
+            }
+        }
+
+        function toggleControls() {
+            document.getElementById('controls').classList.toggle('active');
+        }
+
+        function toggleTaskSidebar() {
+            if (window.taskSystem) {
+                window.taskSystem.toggle();
+            }
+        }
+
+        function onWindowResize() {
+            camera.aspect = window.innerWidth / window.innerHeight;
+            camera.updateProjectionMatrix();
+            renderer.setSize(window.innerWidth, window.innerHeight);
+        }
+
+        function animate() {
+            requestAnimationFrame(animate);
+
+            if (isRealTime) {
+                const now = new Date();
+                hours = now.getHours();
+                minutes = now.getMinutes();
+                seconds = now.getSeconds();
+                updateTime();
+            }
+
+            // 时钟轻微浮动
+            if (clock) {
+                clock.position.y = Math.sin(Date.now() * 0.001) * 0.1;
+            }
+
+            renderer.render(scene, camera);
+        }
+
+        document.addEventListener('DOMContentLoaded', () => {
+            // 初始化 Three.js 场景
+            init();
+
+            // 初始化问答系统
+            window.quizSystem = new QuizSystem({
+                lessonId: 'lesson-clock',
+                container: document.getElementById('quiz-container'),
+                onAnswer: (result) => {
+                    console.log('Quiz answer:', result);
+                }
+            });
+
+            // 初始化任务系统
+            window.taskSystem = new TaskSystem({
+                lessonId: 'lesson-clock',
+                container: document.getElementById('task-container'),
+                onTaskComplete: () => {
+                    console.log('Task completed!');
+                },
+                onGoalComplete: (goalId) => {
+                    console.log('Goal completed:', goalId);
+                }
+            });
+
+            // 默认隐藏任务侧边栏
+            window.taskSystem.hide();
+        });
+    </script>
+</body>
+</html>

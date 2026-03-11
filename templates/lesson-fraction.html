@@ -1,0 +1,701 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>认识分数 - AetherViz 小学教学</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r134/three.min.js"></script>
+    <style>
+        :root {
+            --primary-gradient: linear-gradient(135deg, #3B82F6 0%, #0EA5E9 100%);
+            --bg-gradient: linear-gradient(180deg, #0F172A 0%, #164E63 50%, #155E75 100%);
+        }
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: 'Inter', sans-serif;
+            background: var(--bg-gradient);
+            color: #F8FAFC;
+            font-size: 18px;
+            overflow-x: hidden;
+        }
+        #canvas-container { position: fixed; top: 0; left: 0; width: 100%; height: 100%; z-index: 0; }
+
+        #static-container {
+            position: fixed;
+            top: 70px;
+            left: 0;
+            width: 100%;
+            height: calc(100vh - 70px);
+            display: none;
+            justify-content: center;
+            align-items: center;
+            z-index: 1;
+            background: var(--bg-gradient);
+        }
+
+        #static-container.active {
+            display: flex;
+        }
+
+        .static-diagram {
+            max-width: 90%;
+            max-height: 90%;
+            background: rgba(255, 255, 255, 0.05);
+            border-radius: 20px;
+            padding: 40px;
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+        }
+        .navbar {
+            position: fixed; top: 0; left: 0; right: 0; height: 70px;
+            background: rgba(15, 23, 42, 0.85); backdrop-filter: blur(10px);
+            border-bottom: 2px solid rgba(59, 130, 246, 0.3);
+            display: flex; align-items: center; justify-content: space-between;
+            padding: 0 24px; z-index: 100;
+        }
+        .navbar-title { font-size: 32px; font-weight: bold; background: var(--primary-gradient); -webkit-background-clip: text; -webkit-text-fill-color: transparent; }
+        .btn-kid {
+            min-width: 60px; min-height: 60px; padding: 16px 24px;
+            font-size: 18px; border-radius: 12px; border: none;
+            background: var(--primary-gradient); color: white;
+            cursor: pointer; transition: all 0.3s ease;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+        }
+        .btn-kid:hover { transform: scale(1.05); }
+        .control-panel {
+            position: fixed; right: 0; top: 70px; width: 30%;
+            height: calc(100vh - 70px); background: rgba(22, 78, 99, 0.7);
+            backdrop-filter: blur(10px); border-left: 1px solid rgba(59, 130, 246, 0.25);
+            padding: 24px; overflow-y: auto; z-index: 90;
+        }
+        input[type="range"].kid-slider {
+            -webkit-appearance: none; width: 100%; height: 12px;
+            border-radius: 6px; background: rgba(255, 255, 255, 0.2);
+            cursor: pointer;
+        }
+        input[type="range"].kid-slider::-webkit-slider-thumb {
+            -webkit-appearance: none; width: 32px; height: 32px;
+            border-radius: 50%; background: var(--primary-gradient); cursor: pointer;
+        }
+        .fraction-display {
+            text-align: center; font-size: 48px; font-weight: bold;
+            margin: 24px 0; color: #3B82F6;
+        }
+        .quiz-option {
+            width: 100%; min-height: 60px; font-size: 16px;
+            padding: 12px; margin-bottom: 12px;
+            background: rgba(255, 255, 255, 0.1);
+            border: 2px solid rgba(255, 255, 255, 0.2);
+            border-radius: 12px; color: white; cursor: pointer;
+        }
+        .quiz-option:hover { background: rgba(255, 255, 255, 0.15); }
+
+        /* 移动端优化 */
+        @media (max-width: 640px) {
+            .navbar {
+                padding: 0 12px;
+                height: 56px;
+            }
+            .navbar-title {
+                font-size: 20px;
+            }
+            .btn-kid {
+                min-width: 44px;
+                min-height: 44px;
+                padding: 10px 12px;
+                font-size: 14px;
+            }
+            .control-panel {
+                width: 100%;
+                height: 50vh;
+                top: 56px;
+            }
+            body {
+                font-size: 16px;
+            }
+            .fraction-display {
+                font-size: 36px;
+            }
+        }
+
+        /* 平板端优化 */
+        @media (min-width: 641px) and (max-width: 1024px) {
+            .control-panel {
+                width: 40%;
+            }
+            .navbar-title {
+                font-size: 26px;
+            }
+        }
+
+        /* 触摸设备优化 */
+        @media (hover: none) and (pointer: coarse) {
+            input[type="range"].kid-slider::-webkit-slider-thumb {
+                width: 40px;
+                height: 40px;
+            }
+            .btn-kid {
+                min-height: 48px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div id="canvas-container"></div>
+
+    <!-- 静态展示容器 -->
+    <div id="static-container">
+        <div class="static-diagram">
+            <svg width="600" height="700" viewBox="0 0 600 700">
+                <!-- 标题 -->
+                <text x="300" y="40" text-anchor="middle" fill="#F8FAFC" font-size="32" font-weight="bold">
+                    认识分数
+                </text>
+
+                <!-- 1/2 饼图 -->
+                <g transform="translate(50, 80)">
+                    <circle cx="125" cy="125" r="100" fill="#E5E7EB"/>
+                    <path d="M 125 125 L 125 25 A 100 100 0 0 1 225 125 Z" fill="#3B82F6"/>
+                    <circle cx="125" cy="125" r="100" fill="none" stroke="#FFFFFF" stroke-width="3"/>
+                    <text x="125" y="130" text-anchor="middle" fill="#FFFFFF" font-size="28" font-weight="bold">1/2</text>
+                    <text x="125" y="250" text-anchor="middle" fill="#F8FAFC" font-size="22" font-weight="bold">一半</text>
+                </g>
+
+                <!-- 1/4 饼图 -->
+                <g transform="translate(325, 80)">
+                    <circle cx="125" cy="125" r="100" fill="#E5E7EB"/>
+                    <path d="M 125 125 L 125 25 A 100 100 0 0 1 225 125 Z" fill="#3B82F6"/>
+                    <circle cx="125" cy="125" r="100" fill="none" stroke="#FFFFFF" stroke-width="3"/>
+                    <!-- 分割线 -->
+                    <line x1="125" y1="25" x2="125" y2="225" stroke="#FFFFFF" stroke-width="3"/>
+                    <line x1="25" y1="125" x2="225" y2="125" stroke="#FFFFFF" stroke-width="3"/>
+                    <text x="125" y="130" text-anchor="middle" fill="#FFFFFF" font-size="28" font-weight="bold">1/4</text>
+                    <text x="125" y="250" text-anchor="middle" fill="#F8FAFC" font-size="22" font-weight="bold">四分之一</text>
+                </g>
+
+                <!-- 3/4 饼图 -->
+                <g transform="translate(50, 360)">
+                    <circle cx="125" cy="125" r="100" fill="#E5E7EB"/>
+                    <path d="M 125 125 L 125 25 A 100 100 0 0 1 225 125 L 225 125 A 100 100 0 1 1 125 25 Z" fill="#3B82F6"/>
+                    <circle cx="125" cy="125" r="100" fill="none" stroke="#FFFFFF" stroke-width="3"/>
+                    <!-- 分割线 -->
+                    <line x1="125" y1="25" x2="125" y2="225" stroke="#FFFFFF" stroke-width="3"/>
+                    <line x1="25" y1="125" x2="225" y2="125" stroke="#FFFFFF" stroke-width="3"/>
+                    <text x="125" y="130" text-anchor="middle" fill="#FFFFFF" font-size="28" font-weight="bold">3/4</text>
+                    <text x="125" y="250" text-anchor="middle" fill="#F8FAFC" font-size="22" font-weight="bold">四分之三</text>
+                </g>
+
+                <!-- 分数说明 -->
+                <g transform="translate(325, 360)">
+                    <rect x="0" y="0" width="250" height="280" fill="rgba(255,255,255,0.1)" rx="15"/>
+
+                    <text x="125" y="40" text-anchor="middle" fill="#F8FAFC" font-size="22" font-weight="bold">
+                        分数的组成
+                    </text>
+
+                    <!-- 分子说明 -->
+                    <text x="30" y="80" fill="#FBBF24" font-size="36" font-weight="bold">3</text>
+                    <text x="30" y="110" fill="#CBD5E1" font-size="16">分子（取几份）</text>
+
+                    <!-- 分数线 -->
+                    <line x1="30" y1="120" x2="80" y2="120" stroke="#F8FAFC" stroke-width="3"/>
+
+                    <!-- 分母说明 -->
+                    <text x="30" y="155" fill="#22C55E" font-size="36" font-weight="bold">4</text>
+                    <text x="30" y="185" fill="#CBD5E1" font-size="16">分母（平均分几份）</text>
+
+                    <!-- 含义说明 -->
+                    <text x="30" y="225" fill="#F8FAFC" font-size="18" font-weight="bold">
+                        含义：
+                    </text>
+                    <text x="30" y="255" fill="#CBD5E1" font-size="15">
+                        把整体平均分成 4 份，
+                    </text>
+                    <text x="30" y="275" fill="#CBD5E1" font-size="15">
+                        取其中的 3 份
+                    </text>
+                </g>
+            </svg>
+        </div>
+    </div>
+
+    <nav class="navbar">
+        <div style="display: flex; align-items: center; gap: 16px;">
+            <button class="btn-kid" onclick="window.location.href='../'">
+                🏠 返回首页
+            </button>
+            <div class="navbar-title">🔢 认识分数</div>
+        </div>
+        <div style="display: flex; gap: 12px;">
+            <button class="btn-kid" onclick="toggleStaticMode()">
+                🖼️ 静态展示
+            </button>
+            <button class="btn-kid" onclick="toggleControls()">🎮 控制</button>
+        </div>
+    </nav>
+
+    <aside class="control-panel" id="controls">
+        <h2 style="font-size: 24px; margin-bottom: 16px;">🎮 参数控制</h2>
+
+        <!-- 模式切换 -->
+        <div style="margin-bottom: 24px;">
+            <label style="display: block; margin-bottom: 8px;">🔢 学习模式</label>
+            <div style="display: flex; gap: 8px;">
+                <button class="btn-kid" id="modeBasic" onclick="setMode('basic')" style="flex: 1; font-size: 14px; padding: 12px 8px;">基础</button>
+                <button class="btn-kid" id="modeCompare" onclick="setMode('compare')" style="flex: 1; font-size: 14px; padding: 12px 8px;">比较</button>
+                <button class="btn-kid" id="modeAdd" onclick="setMode('add')" style="flex: 1; font-size: 14px; padding: 12px 8px;">加法</button>
+            </div>
+        </div>
+
+        <!-- 基础模式控件 -->
+        <div id="basicControls">
+            <div style="margin-bottom: 24px;">
+                <label style="display: block; margin-bottom: 8px;">🔢 分子</label>
+                <input type="range" class="kid-slider" id="numerator" min="0" max="7" value="3" oninput="updateFraction()">
+                <div style="text-align: center; margin-top: 8px;">分子: <span id="num-value">3</span></div>
+            </div>
+
+            <div style="margin-bottom: 24px;">
+                <label style="display: block; margin-bottom: 8px;">📋 分母</label>
+                <input type="range" class="kid-slider" id="denominator" min="2" max="8" value="4" oninput="updateFraction()">
+                <div style="text-align: center; margin-top: 8px;">分母: <span id="den-value">4</span></div>
+            </div>
+
+            <div class="fraction-display" id="fraction-display">
+                <span id="num-display">3</span>/<span id="den-display">4</span>
+            </div>
+
+            <p style="margin-bottom: 24px; text-align: center; color: rgba(255,255,255,0.8);" id="description">
+                把整体平均分成 4 份，取其中的 3 份
+            </p>
+        </div>
+
+        <!-- 比较模式控件 -->
+        <div id="compareControls" style="display: none;">
+            <div style="margin-bottom: 24px;">
+                <label style="display: block; margin-bottom: 8px;">🔵 第一个分数</label>
+                <div style="display: flex; gap: 8px; margin-bottom: 8px;">
+                    <input type="range" class="kid-slider" id="compare1Num" min="1" max="7" value="1" oninput="updateCompare()">
+                    <input type="range" class="kid-slider" id="compare1Den" min="2" max="8" value="2" oninput="updateCompare()">
+                </div>
+                <div class="fraction-display" style="font-size: 32px;">
+                    <span id="compare1Display">1</span>/<span id="compare1DenDisplay">2</span>
+                </div>
+            </div>
+
+            <div style="margin-bottom: 24px;">
+                <label style="display: block; margin-bottom: 8px;">🟢 第二个分数</label>
+                <div style="display: flex; gap: 8px; margin-bottom: 8px;">
+                    <input type="range" class="kid-slider" id="compare2Num" min="1" max="7" value="1" oninput="updateCompare()">
+                    <input type="range" class="kid-slider" id="compare2Den" min="2" max="8" value="4" oninput="updateCompare()">
+                </div>
+                <div class="fraction-display" style="font-size: 32px;">
+                    <span id="compare2Display">1</span>/<span id="compare2DenDisplay">4</span>
+                </div>
+            </div>
+
+            <div class="balance-indicator">
+                <h3 style="font-size: 20px; margin-bottom: 8px;">⚖️ 比较结果</h3>
+                <div id="compareResult" style="font-size: 28px; font-weight: bold; color: #FBBF24;">1/2 > 1/4</div>
+            </div>
+        </div>
+
+        <!-- 加法模式控件 -->
+        <div id="addControls" style="display: none;">
+            <div style="margin-bottom: 24px;">
+                <label style="display: block; margin-bottom: 8px;">➕ 加数 1</label>
+                <input type="range" class="kid-slider" id="add1Num" min="1" max="7" value="1" oninput="updateAddition()">
+                <div style="text-align: center; margin-top: 8px;">
+                    <span id="add1Display">1</span>/<span id="add1DenDisplay">4</span>
+                </div>
+            </div>
+
+            <div style="margin-bottom: 24px;">
+                <label style="display: block; margin-bottom: 8px;">➕ 加数 2</label>
+                <input type="range" class="kid-slider" id="add2Num" min="1" max="7" value="2" oninput="updateAddition()">
+                <div style="text-align: center; margin-top: 8px;">
+                    <span id="add2Display">2</span>/<span id="add2DenDisplay">4</span>
+                </div>
+            </div>
+
+            <div class="fraction-display" style="font-size: 36px; margin: 16px 0;">
+                <span id="add1Result">1</span>/<span id="add1DenResult">4</span>
+                <span style="margin: 0 12px;">+</span>
+                <span id="add2Result">2</span>/<span id="add2DenResult">4</span>
+                <span style="margin: 0 12px;">=</span>
+                <span id="addSum" style="color: #22C55E;">3</span>/<span id="addSumDen" style="color: #22C55E;">4</span>
+            </div>
+
+            <button class="btn-kid" onclick="playAdditionAnimation()" style="width: 100%; margin-bottom: 16px;">
+                🎬 播放加法动画
+            </button>
+        </div>
+
+        <button class="btn-kid" onclick="resetScene()" style="width: 100%;">🔄 重置</button>
+
+        <div style="margin-top: 24px; padding: 16px; background: rgba(255,255,255,0.05); border-radius: 12px;">
+            <h3 style="font-size: 18px; margin-bottom: 12px;">❓ 小测验</h3>
+            <p style="margin-bottom: 12px;">1/2 和 1/4 哪个大？</p>
+            <button class="quiz-option" onclick="checkAnswer(0)">1/2 大</button>
+            <button class="quiz-option" onclick="checkAnswer(1)">1/4 大</button>
+            <button class="quiz-option" onclick="checkAnswer(2)">一样大</button>
+        </div>
+    </aside>
+
+    <script>
+        let scene, camera, renderer, fractionGroup;
+        let numerator = 3, denominator = 4;
+        let currentMode = 'basic';
+        let compareGroup1, compareGroup2;
+        let addPie1, addPie2, addPieSum;
+
+        function init() {
+            const container = document.getElementById('canvas-container');
+            scene = new THREE.Scene();
+            camera = new THREE.PerspectiveCamera(60, window.innerWidth / window.innerHeight, 0.1, 1000);
+            camera.position.set(-2.5, 6, 12);
+            camera.lookAt(0, 0, 0);
+            renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
+            renderer.setSize(window.innerWidth, window.innerHeight);
+            container.appendChild(renderer.domElement);
+
+            const ambientLight = new THREE.AmbientLight(0xffffff, 0.6);
+            scene.add(ambientLight);
+            const directionalLight = new THREE.DirectionalLight(0xffffff, 0.8);
+            directionalLight.position.set(10, 20, 10);
+            scene.add(directionalLight);
+
+            createFractionPie();
+            window.addEventListener('resize', onWindowResize);
+            animate();
+        }
+
+        function setMode(mode) {
+            currentMode = mode;
+
+            // 更新按钮样式
+            document.querySelectorAll('[id^="mode"]').forEach(btn => {
+                btn.style.opacity = '0.6';
+            });
+            document.getElementById('mode' + mode.charAt(0).toUpperCase() + mode.slice(1)).style.opacity = '1';
+
+            // 显示/隐藏控件
+            document.getElementById('basicControls').style.display = mode === 'basic' ? 'block' : 'none';
+            document.getElementById('compareControls').style.display = mode === 'compare' ? 'block' : 'none';
+            document.getElementById('addControls').style.display = mode === 'add' ? 'block' : 'none';
+
+            // 清除旧的图形
+            if (fractionGroup) {
+                scene.remove(fractionGroup);
+                fractionGroup.traverse((child) => {
+                    if (child.geometry) child.geometry.dispose();
+                    if (child.material) child.material.dispose();
+                });
+            }
+            if (compareGroup1) {
+                scene.remove(compareGroup1);
+                compareGroup1.traverse((child) => {
+                    if (child.geometry) child.geometry.dispose();
+                    if (child.material) child.material.dispose();
+                });
+            }
+            if (compareGroup2) {
+                scene.remove(compareGroup2);
+                compareGroup2.traverse((child) => {
+                    if (child.geometry) child.geometry.dispose();
+                    if (child.material) child.material.dispose();
+                });
+            }
+            if (addPie1) scene.remove(addPie1);
+            if (addPie2) scene.remove(addPie2);
+            if (addPieSum) scene.remove(addPieSum);
+
+            // 创建对应模式的图形
+            if (mode === 'basic') {
+                createFractionPie();
+            } else if (mode === 'compare') {
+                updateCompare();
+            } else if (mode === 'add') {
+                updateAddition();
+            }
+        }
+
+        function createFractionPie(num = numerator, den = denominator, x = 0, color = 0x3B82F6) {
+            const group = new THREE.Group();
+            const radius = 2;
+
+            // 填充扇形
+            if (num > 0) {
+                const shape = new THREE.Shape();
+                const anglePerSegment = (Math.PI * 2) / den;
+
+                shape.moveTo(0, 0);
+                for (let i = 0; i <= num; i++) {
+                    const angle = i * anglePerSegment;
+                    const shapeX = Math.cos(angle) * radius;
+                    const shapeY = Math.sin(angle) * radius;
+                    shape.lineTo(shapeX, shapeY);
+                }
+                shape.lineTo(0, 0);
+
+                const geometry = new THREE.ShapeGeometry(shape);
+                const material = new THREE.MeshStandardMaterial({
+                    color: color,
+                    side: THREE.DoubleSide
+                });
+                const mesh = new THREE.Mesh(geometry, material);
+                mesh.rotation.x = -Math.PI / 2;
+                mesh.position.y = 0.01;
+                group.add(mesh);
+            }
+
+            // 背景圆
+            const bgGeometry = new THREE.CircleGeometry(radius, 64);
+            const bgMaterial = new THREE.MeshStandardMaterial({
+                color: 0xcccccc,
+                side: THREE.DoubleSide
+            });
+            const bgMesh = new THREE.Mesh(bgGeometry, bgMaterial);
+            bgMesh.rotation.x = -Math.PI / 2;
+            group.add(bgMesh);
+
+            // 分隔线
+            for (let i = 0; i < den; i++) {
+                const angle = i * ((Math.PI * 2) / den);
+                const points = [
+                    new THREE.Vector3(0, 0.02, 0),
+                    new THREE.Vector3(Math.cos(angle) * radius, 0.02, Math.sin(angle) * radius)
+                ];
+                const geometry = new THREE.BufferGeometry().setFromPoints(points);
+                const line = new THREE.Line(geometry, new THREE.LineBasicMaterial({ color: 0xffffff }));
+                group.add(line);
+            }
+
+            group.position.x = x;
+            return group;
+        }
+
+        function updateFraction() {
+            numerator = parseInt(document.getElementById('numerator').value);
+            denominator = parseInt(document.getElementById('denominator').value);
+
+            if (numerator > denominator) {
+                numerator = denominator;
+                document.getElementById('numerator').value = numerator;
+            }
+
+            document.getElementById('num-value').textContent = numerator;
+            document.getElementById('den-value').textContent = denominator;
+            document.getElementById('num-display').textContent = numerator;
+            document.getElementById('den-display').textContent = denominator;
+            document.getElementById('description').textContent =
+                `把整体平均分成 ${denominator} 份，取其中的 ${numerator} 份`;
+
+            createFractionPie();
+        }
+
+        function updateCompare() {
+            const num1 = parseInt(document.getElementById('compare1Num').value);
+            const den1 = parseInt(document.getElementById('compare1Den').value);
+            const num2 = parseInt(document.getElementById('compare2Num').value);
+            const den2 = parseInt(document.getElementById('compare2Den').value);
+
+            document.getElementById('compare1Display').textContent = num1;
+            document.getElementById('compare1DenDisplay').textContent = den1;
+            document.getElementById('compare2Display').textContent = num2;
+            document.getElementById('compare2DenDisplay').textContent = den2;
+
+            // 比较大小
+            const val1 = num1 / den1;
+            const val2 = num2 / den2;
+            let result = '';
+            if (Math.abs(val1 - val2) < 0.0001) {
+                result = `${num1}/${den1} = ${num2}/${den2}`;
+            } else if (val1 > val2) {
+                result = `${num1}/${den1} > ${num2}/${den2}`;
+            } else {
+                result = `${num1}/${den1} < ${num2}/${den2}`;
+            }
+            document.getElementById('compareResult').textContent = result;
+
+            // 创建两个饼图
+            if (compareGroup1) scene.remove(compareGroup1);
+            if (compareGroup2) scene.remove(compareGroup2);
+
+            compareGroup1 = createFractionPie(num1, den1, -2.5, 0x3B82F6);
+            compareGroup2 = createFractionPie(num2, den2, 2.5, 0x10B981);
+
+            scene.add(compareGroup1);
+            scene.add(compareGroup2);
+        }
+
+        function updateAddition() {
+            const num1 = parseInt(document.getElementById('add1Num').value);
+            const den1 = 4; // 固定分母为4
+            const num2 = parseInt(document.getElementById('add2Num').value);
+            const den2 = 4;
+            const sumNum = num1 + num2;
+
+            document.getElementById('add1Display').textContent = num1;
+            document.getElementById('add1DenDisplay').textContent = den1;
+            document.getElementById('add2Display').textContent = num2;
+            document.getElementById('add2DenDisplay').textContent = den2;
+            document.getElementById('add1Result').textContent = num1;
+            document.getElementById('add1DenResult').textContent = den1;
+            document.getElementById('add2Result').textContent = num2;
+            document.getElementById('add2DenResult').textContent = den2;
+            document.getElementById('addSum').textContent = sumNum;
+            document.getElementById('addSumDen').textContent = den1;
+
+            // 创建三个饼图
+            if (addPie1) scene.remove(addPie1);
+            if (addPie2) scene.remove(addPie2);
+            if (addPieSum) scene.remove(addPieSum);
+
+            addPie1 = createFractionPie(num1, den1, -5, 0x3B82F6);
+            addPie2 = createFractionPie(num2, den2, 0, 0x10B981);
+            addPieSum = createFractionPie(sumNum, den1, 5, 0xFBBF24);
+
+            scene.add(addPie1);
+            scene.add(addPie2);
+            scene.add(addPieSum);
+        }
+
+        function playAdditionAnimation() {
+            const num1 = parseInt(document.getElementById('add1Num').value);
+            const num2 = parseInt(document.getElementById('add2Num').value);
+            const den1 = 4;
+
+            let currentNum1 = 0;
+            let currentNum2 = 0;
+            let phase = 0;
+
+            const animateAddition = () => {
+                if (phase === 0) {
+                    // 第一阶段：显示第一个加数
+                    if (currentNum1 < num1) {
+                        currentNum1 += 0.1;
+                        if (addPie1) scene.remove(addPie1);
+                        addPie1 = createFractionPie(Math.min(Math.ceil(currentNum1), num1), den1, -5, 0x3B82F6);
+                        scene.add(addPie1);
+                        requestAnimationFrame(animateAddition);
+                    } else {
+                        phase = 1;
+                        setTimeout(() => requestAnimationFrame(animateAddition), 500);
+                    }
+                } else if (phase === 1) {
+                    // 第二阶段：显示第二个加数
+                    if (currentNum2 < num2) {
+                        currentNum2 += 0.1;
+                        if (addPie2) scene.remove(addPie2);
+                        addPie2 = createFractionPie(Math.min(Math.ceil(currentNum2), num2), den1, 0, 0x10B981);
+                        scene.add(addPie2);
+                        requestAnimationFrame(animateAddition);
+                    } else {
+                        phase = 2;
+                        setTimeout(() => requestAnimationFrame(animateAddition), 500);
+                    }
+                } else if (phase === 2) {
+                    // 第三阶段：显示和（合并）
+                    const sumNum = num1 + num2;
+                    if (addPieSum) scene.remove(addPieSum);
+                    addPieSum = createFractionPie(sumNum, den1, 5, 0xFBBF24);
+                    scene.add(addPieSum);
+
+                    // 闪烁效果
+                    addPieSum.children[0].material.emissive = new THREE.Color(0xFBBF24);
+                    addPieSum.children[0].material.emissiveIntensity = 0.5;
+                }
+            };
+
+            // 重置并开始动画
+            if (addPie1) scene.remove(addPie1);
+            if (addPie2) scene.remove(addPie2);
+            if (addPieSum) scene.remove(addPieSum);
+            animateAddition();
+        }
+
+        function checkAnswer(answer) {
+            if (answer === 0) {
+                alert('✅ 太棒了！分母越小，分数越大，所以 1/2 大于 1/4。');
+                showCelebration();
+            } else {
+                alert('不对哦，再想一想！💪');
+            }
+        }
+
+        function showCelebration() {
+            const stars = document.createElement('div');
+            stars.innerHTML = '⭐⭐⭐ 太棒了！';
+            stars.style.cssText = 'position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%); font-size: 48px; z-index: 1000;';
+            document.body.appendChild(stars);
+            setTimeout(() => stars.remove(), 1500);
+        }
+
+        function resetScene() {
+            if (currentMode === 'basic') {
+                numerator = 3;
+                denominator = 4;
+                document.getElementById('numerator').value = 3;
+                document.getElementById('denominator').value = 4;
+                updateFraction();
+            } else if (currentMode === 'compare') {
+                document.getElementById('compare1Num').value = 1;
+                document.getElementById('compare1Den').value = 2;
+                document.getElementById('compare2Num').value = 1;
+                document.getElementById('compare2Den').value = 4;
+                updateCompare();
+            } else if (currentMode === 'add') {
+                document.getElementById('add1Num').value = 1;
+                document.getElementById('add2Num').value = 2;
+                updateAddition();
+            }
+        }
+
+        let isStaticMode = false;
+
+        function toggleStaticMode() {
+            isStaticMode = !isStaticMode;
+            const staticContainer = document.getElementById('static-container');
+            const canvasContainer = document.getElementById('canvas-container');
+
+            if (isStaticMode) {
+                staticContainer.classList.add('active');
+                canvasContainer.style.display = 'none';
+            } else {
+                staticContainer.classList.remove('active');
+                canvasContainer.style.display = 'block';
+            }
+        }
+
+        function toggleControls() {
+            document.getElementById('controls').classList.toggle('active');
+        }
+
+        function onWindowResize() {
+            camera.aspect = window.innerWidth / window.innerHeight;
+            camera.updateProjectionMatrix();
+            renderer.setSize(window.innerWidth, window.innerHeight);
+        }
+
+        function animate() {
+            requestAnimationFrame(animate);
+
+            if (currentMode === 'basic' && fractionGroup) {
+                fractionGroup.rotation.y += 0.005;
+            } else if (currentMode === 'compare') {
+                if (compareGroup1) compareGroup1.rotation.y += 0.003;
+                if (compareGroup2) compareGroup2.rotation.y += 0.003;
+            } else if (currentMode === 'add') {
+                if (addPie1) addPie1.rotation.y += 0.003;
+                if (addPie2) addPie2.rotation.y += 0.003;
+                if (addPieSum) addPieSum.rotation.y += 0.003;
+            }
+
+            renderer.render(scene, camera);
+        }
+
+        document.addEventListener('DOMContentLoaded', init);
+    </script>
+</body>
+</html>

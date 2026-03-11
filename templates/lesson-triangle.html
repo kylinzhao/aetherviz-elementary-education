@@ -1,0 +1,733 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>认识三角形 - AetherViz 小学教学</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r134/three.min.js"></script>
+    <style>
+        :root {
+            --primary-gradient: linear-gradient(135deg, #8B5CF6 0%, #EC4899 100%);
+            --bg-gradient: linear-gradient(180deg, #0F172A 0%, #581C87 50%, #701A75 100%);
+        }
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: 'Inter', sans-serif;
+            background: var(--bg-gradient);
+            color: #F8FAFC;
+            font-size: 18px;
+            overflow-x: hidden;
+        }
+        #canvas-container { position: fixed; top: 0; left: 0; width: 100%; height: 100%; z-index: 0; }
+
+        #static-container {
+            position: fixed;
+            top: 70px;
+            left: 0;
+            width: 100%;
+            height: calc(100vh - 70px);
+            display: none;
+            justify-content: center;
+            align-items: center;
+            z-index: 1;
+            background: var(--bg-gradient);
+        }
+
+        #static-container.active {
+            display: flex;
+        }
+
+        .static-diagram {
+            max-width: 90%;
+            max-height: 90%;
+            background: rgba(255, 255, 255, 0.05);
+            border-radius: 20px;
+            padding: 40px;
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+        }
+        .navbar {
+            position: fixed; top: 0; left: 0; right: 0; height: 70px;
+            background: rgba(15, 23, 42, 0.85); backdrop-filter: blur(10px);
+            border-bottom: 2px solid rgba(139, 92, 246, 0.3);
+            display: flex; align-items: center; justify-content: space-between;
+            padding: 0 24px; z-index: 100;
+        }
+        .navbar-title { font-size: 32px; font-weight: bold; background: var(--primary-gradient); -webkit-background-clip: text; -webkit-text-fill-color: transparent; }
+        .btn-kid {
+            min-width: 60px; min-height: 60px; padding: 16px 24px;
+            font-size: 18px; border-radius: 12px; border: none;
+            background: var(--primary-gradient); color: white;
+            cursor: pointer; transition: all 0.3s ease;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+        }
+        .btn-kid:hover { transform: scale(1.05); }
+        .control-panel {
+            position: fixed; right: 0; top: 70px; width: 30%;
+            height: calc(100vh - 70px); background: rgba(88, 28, 135, 0.7);
+            backdrop-filter: blur(10px); border-left: 1px solid rgba(139, 92, 246, 0.25);
+            padding: 24px; overflow-y: auto; z-index: 90;
+        }
+        .tab-buttons {
+            display: flex; gap: 8px; margin-bottom: 16px;
+        }
+        .tab-btn {
+            flex: 1; padding: 12px; border-radius: 8px;
+            border: 2px solid rgba(255, 255, 255, 0.2);
+            background: rgba(255, 255, 255, 0.1);
+            color: white; cursor: pointer; transition: all 0.3s;
+        }
+        .tab-btn.active {
+            background: var(--primary-gradient);
+            border-color: transparent;
+        }
+        input[type="range"].kid-slider {
+            -webkit-appearance: none; width: 100%; height: 12px;
+            border-radius: 6px; background: rgba(255, 255, 255, 0.2);
+            cursor: pointer;
+        }
+        input[type="range"].kid-slider::-webkit-slider-thumb {
+            -webkit-appearance: none; width: 32px; height: 32px;
+            border-radius: 50%; background: var(--primary-gradient); cursor: pointer;
+        }
+        .info-box {
+            padding: 16px; background: rgba(255,255,255,0.05);
+            border-radius: 12px; margin-top: 16px;
+        }
+        .property-display {
+            text-align: center; padding: 16px;
+            background: rgba(255, 255, 255, 0.05);
+            border-radius: 12px; margin: 16px 0;
+        }
+
+        /* 移动端优化 */
+        @media (max-width: 640px) {
+            .navbar {
+                padding: 0 12px;
+                height: 56px;
+            }
+            .navbar-title {
+                font-size: 20px;
+            }
+            .btn-kid {
+                min-width: 44px;
+                min-height: 44px;
+                padding: 10px 12px;
+                font-size: 14px;
+            }
+            .control-panel {
+                width: 100%;
+                height: 50vh;
+                top: 56px;
+            }
+            body {
+                font-size: 16px;
+            }
+        }
+
+        /* 平板端优化 */
+        @media (min-width: 641px) and (max-width: 1024px) {
+            .control-panel {
+                width: 40%;
+            }
+            .navbar-title {
+                font-size: 26px;
+            }
+        }
+
+        /* 触摸设备优化 */
+        @media (hover: none) and (pointer: coarse) {
+            input[type="range"].kid-slider::-webkit-slider-thumb {
+                width: 40px;
+                height: 40px;
+            }
+            .btn-kid {
+                min-height: 48px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div id="canvas-container"></div>
+
+    <!-- 任务侧边栏容器 -->
+    <div id="task-container"></div>
+
+    <!-- 静态展示容器 -->
+    <div id="static-container">
+        <div class="static-diagram">
+            <svg width="650" height="750" viewBox="0 0 650 750">
+                <!-- 标题 -->
+                <text x="325" y="40" text-anchor="middle" fill="#F8FAFC" font-size="32" font-weight="bold">
+                    三角形类型
+                </text>
+
+                <!-- 等边三角形 -->
+                <g transform="translate(50, 80)">
+                    <polygon points="75,20 20,130 130,130" fill="#8B5CF6" stroke="#FFFFFF" stroke-width="3"/>
+                    <text x="75" y="95" text-anchor="middle" fill="#FFFFFF" font-size="20" font-weight="bold">等边</text>
+
+                    <!-- 边标注 -->
+                    <text x="75" y="10" text-anchor="middle" fill="#22C55E" font-size="14">边长相同</text>
+                    <text x="75" y="150" text-anchor="middle" fill="#F8FAFC" font-size="18" font-weight="bold">等边三角形</text>
+                    <text x="75" y="172" text-anchor="middle" fill="#CBD5E1" font-size="14">三条边相等，三个角60°</text>
+                </g>
+
+                <!-- 等腰三角形 -->
+                <g transform="translate(225, 80)">
+                    <polygon points="75,20 35,130 115,130" fill="#EC4899" stroke="#FFFFFF" stroke-width="3"/>
+                    <!-- 标注相等的边 -->
+                    <line x1="55" y1="60" x2="70" y2="95" stroke="#FBBF24" stroke-width="2" stroke-dasharray="4"/>
+                    <line x1="95" y1="60" x2="80" y2="95" stroke="#FBBF24" stroke-width="2" stroke-dasharray="4"/>
+
+                    <text x="75" y="95" text-anchor="middle" fill="#FFFFFF" font-size="20" font-weight="bold">等腰</text>
+                    <text x="75" y="150" text-anchor="middle" fill="#F8FAFC" font-size="18" font-weight="bold">等腰三角形</text>
+                    <text x="75" y="172" text-anchor="middle" fill="#CBD5E1" font-size="14">两条边相等，两个底角相等</text>
+                </g>
+
+                <!-- 直角三角形 -->
+                <g transform="translate(400, 80)">
+                    <polygon points="50,30 120,130 50,130" fill="#10B981" stroke="#FFFFFF" stroke-width="3"/>
+                    <!-- 直角标记 -->
+                    <rect x="50" y="115" width="15" height="15" fill="none" stroke="#EF4444" stroke-width="2"/>
+
+                    <text x="75" y="100" text-anchor="middle" fill="#FFFFFF" font-size="20" font-weight="bold">直角</text>
+                    <text x="100" y="105" fill="#EF4444" font-size="16">90°</text>
+
+                    <text x="75" y="150" text-anchor="middle" fill="#F8FAFC" font-size="18" font-weight="bold">直角三角形</text>
+                    <text x="75" y="172" text-anchor="middle" fill="#CBD5E1" font-size="14">有一个角是直角(90°)</text>
+                </g>
+
+                <!-- 锐角三角形 -->
+                <g transform="translate(50, 280)">
+                    <polygon points="75,20 30,130 120,130" fill="#3B82F6" stroke="#FFFFFF" stroke-width="3"/>
+                    <text x="75" y="95" text-anchor="middle" fill="#FFFFFF" font-size="20" font-weight="bold">锐角</text>
+                    <text x="75" y="150" text-anchor="middle" fill="#F8FAFC" font-size="18" font-weight="bold">锐角三角形</text>
+                    <text x="75" y="172" text-anchor="middle" fill="#CBD5E1" font-size="14">三个角都小于90°</text>
+                </g>
+
+                <!-- 钝角三角形 -->
+                <g transform="translate(225, 280)">
+                    <polygon points="110,30 20,130 120,130" fill="#F59E0B" stroke="#FFFFFF" stroke-width="3"/>
+                    <text x="75" y="100" text-anchor="middle" fill="#FFFFFF" font-size="20" font-weight="bold">钝角</text>
+                    <text x="110" y="45" fill="#EF4444" font-size="16">>90°</text>
+
+                    <text x="75" y="150" text-anchor="middle" fill="#F8FAFC" font-size="18" font-weight="bold">钝角三角形</text>
+                    <text x="75" y="172" text-anchor="middle" fill="#CBD5E1" font-size="14">有一个角大于90°</text>
+                </g>
+
+                <!-- 任意三角形 -->
+                <g transform="translate(400, 280)">
+                    <polygon points="85,20 30,130 115,100" fill="#6366F1" stroke="#FFFFFF" stroke-width="3"/>
+                    <text x="75" y="95" text-anchor="middle" fill="#FFFFFF" font-size="20" font-weight="bold">任意</text>
+                    <text x="75" y="150" text-anchor="middle" fill="#F8FAFC" font-size="18" font-weight="bold">任意三角形</text>
+                    <text x="75" y="172" text-anchor="middle" fill="#CBD5E1" font-size="14">三条边都不相等</text>
+                </g>
+
+                <!-- 三角形特征说明 -->
+                <g transform="translate(50, 480)">
+                    <rect x="0" y="0" width="550" height="240" fill="rgba(255,255,255,0.1)" rx="15"/>
+
+                    <text x="275" y="35" text-anchor="middle" fill="#F8FAFC" font-size="24" font-weight="bold">
+                        三角形的共同特征
+                    </text>
+
+                    <text x="30" y="70" fill="#F8FAFC" font-size="20" font-weight="bold">
+                        ✓ 有 3 条边
+                    </text>
+
+                    <text x="30" y="105" fill="#F8FAFC" font-size="20" font-weight="bold">
+                        ✓ 有 3 个角
+                    </text>
+
+                    <text x="30" y="140" fill="#F8FAFC" font-size="20" font-weight="bold">
+                        ✓ 3 个内角和 = 180°
+                    </text>
+
+                    <text x="30" y="175" fill="#F8FAFC" font-size="20" font-weight="bold">
+                        ✓ 任意两边之和 > 第三边
+                    </text>
+
+                    <!-- 生活中的三角形 -->
+                    <text x="300" y="70" fill="#FBBF24" font-size="18" font-weight="bold">
+                        💡 生活中的三角形
+                    </text>
+                    <text x="300" y="105" fill="#CBD5E1" font-size="16">
+                        🎸 三角架 - 稳固支撑
+                    </text>
+                    <text x="300" y="135" fill="#CBD5E1" font-size="16">
+                        🚧 警示牌 - 引人注意
+                    </text>
+                    <text x="300" y="165" fill="#CBD5E1" font-size="16">
+                        🍕 切披萨 - 平均分配
+                    </text>
+                    <text x="300" y="195" fill="#CBD5E1" font-size="16">
+                        🔺 屋顶 - 排水防漏
+                    </text>
+                </g>
+            </svg>
+        </div>
+    </div>
+
+    <nav class="navbar">
+        <div style="display: flex; align-items: center; gap: 16px;">
+            <button class="btn-kid" onclick="window.location.href='../'">
+                🏠 返回首页
+            </button>
+            <div class="navbar-title">🔺 认识三角形</div>
+        </div>
+        <div style="display: flex; gap: 12px;">
+            <button class="btn-kid" onclick="toggleStaticMode()">
+                🖼️ 静态展示
+            </button>
+            <button class="btn-kid" onclick="toggleTaskSidebar()">
+                📋 探索任务
+            </button>
+            <button class="btn-kid" onclick="toggleControls()">🎮 控制</button>
+        </div>
+    </nav>
+
+    <aside class="control-panel" id="controls">
+        <h2 style="font-size: 24px; margin-bottom: 16px;">🔺 三角形类型</h2>
+
+        <div class="tab-buttons">
+            <button class="tab-btn active" onclick="switchTriangle('equilateral')">等边</button>
+            <button class="tab-btn" onclick="switchTriangle('isosceles')">等腰</button>
+            <button class="tab-btn" onclick="switchTriangle('right')">直角</button>
+            <button class="tab-btn" onclick="switchTriangle('scalene')">任意</button>
+        </div>
+
+        <!-- 等边三角形 -->
+        <div id="equilateral-controls">
+            <div class="property-display">
+                <h3 style="font-size: 18px; margin-bottom: 8px;">📐 等边三角形</h3>
+                <div style="font-size: 14px; color: rgba(255,255,255,0.6); margin-bottom: 8px;">
+                    <div>三条边都相等</div>
+                    <div>三个角都是 60°</div>
+                </div>
+            </div>
+
+            <div style="margin-bottom: 24px;">
+                <label style="display: block; margin-bottom: 8px;">📏 边长</label>
+                <input type="range" class="kid-slider" id="equilateralSize" min="2" max="5" value="3" step="0.1" oninput="updateEquilateral()">
+                <div style="text-align: center; margin-top: 8px;">边长: <span id="equilateralSizeVal">3</span></div>
+            </div>
+
+            <div class="info-box">
+                <h3 style="font-size: 16px; margin-bottom: 8px;">💡 小知识</h3>
+                <p style="font-size: 14px; line-height: 1.6;">
+                    等边三角形是最特殊的三角形，它既是等腰三角形，又是锐角三角形。
+                </p>
+            </div>
+        </div>
+
+        <!-- 等腰三角形 -->
+        <div id="isosceles-controls" style="display: none;">
+            <div class="property-display">
+                <h3 style="font-size: 18px; margin-bottom: 8px;">📐 等腰三角形</h3>
+                <div style="font-size: 14px; color: rgba(255,255,255,0.6); margin-bottom: 8px;">
+                    <div>两条边相等</div>
+                    <div>两个底角相等</div>
+                </div>
+            </div>
+
+            <div style="margin-bottom: 24px;">
+                <label style="display: block; margin-bottom: 8px;">📏 底边</label>
+                <input type="range" class="kid-slider" id="isoBase" min="2" max="5" value="3" step="0.1" oninput="updateIsosceles()">
+                <div style="text-align: center; margin-top: 8px;">底: <span id="isoBaseVal">3</span></div>
+            </div>
+
+            <div style="margin-bottom: 24px;">
+                <label style="display: block; margin-bottom: 8px;">📏 腰长</label>
+                <input type="range" class="kid-slider" id="isoLeg" min="2" max="6" value="4" step="0.1" oninput="updateIsosceles()">
+                <div style="text-align: center; margin-top: 8px;">腰: <span id="isoLegVal">4</span></div>
+            </div>
+
+            <div class="info-box">
+                <h3 style="font-size: 16px; margin-bottom: 8px;">💡 小知识</h3>
+                <p style="font-size: 14px; line-height: 1.6;">
+                    等腰三角形沿高对折后，两边完全重合。生活中很多物品都设计成等腰三角形。
+                </p>
+            </div>
+        </div>
+
+        <!-- 直角三角形 -->
+        <div id="right-controls" style="display: none;">
+            <div class="property-display">
+                <h3 style="font-size: 18px; margin-bottom: 8px;">📐 直角三角形</h3>
+                <div style="font-size: 14px; color: rgba(255,255,255,0.6); margin-bottom: 8px;">
+                    <div>有一个角是 90°</div>
+                    <div>满足勾股定理</div>
+                </div>
+            </div>
+
+            <div style="margin-bottom: 24px;">
+                <label style="display: block; margin-bottom: 8px;">📏 直角边 A</label>
+                <input type="range" class="kid-slider" id="rightA" min="2" max="5" value="3" step="0.1" oninput="updateRight()">
+                <div style="text-align: center; margin-top: 8px;">A: <span id="rightAVal">3</span></div>
+            </div>
+
+            <div style="margin-bottom: 24px;">
+                <label style="display: block; margin-bottom: 8px;">📏 直角边 B</label>
+                <input type="range" class="kid-slider" id="rightB" min="2" max="5" value="4" step="0.1" oninput="updateRight()">
+                <div style="text-align: center; margin-top: 8px;">B: <span id="rightBVal">4</span></div>
+            </div>
+
+            <div class="property-display" style="background: rgba(16, 185, 129, 0.1);">
+                <div style="font-size: 14px; margin-bottom: 4px;">斜边长度</div>
+                <div style="font-size: 24px; font-weight: bold; color: #34D399;" id="rightC">5.0</div>
+            </div>
+
+            <div class="info-box">
+                <h3 style="font-size: 16px; margin-bottom: 8px;">💡 勾股定理</h3>
+                <p style="font-size: 14px; line-height: 1.6;">
+                    A² + B² = C²<br>
+                    3² + 4² = 5²<br>
+                    9 + 16 = 25
+                </p>
+            </div>
+        </div>
+
+        <!-- 任意三角形 -->
+        <div id="scalene-controls" style="display: none;">
+            <div class="property-display">
+                <h3 style="font-size: 18px; margin-bottom: 8px;">📐 任意三角形</h3>
+                <div style="font-size: 14px; color: rgba(255,255,255,0.6); margin-bottom: 8px;">
+                    <div>三条边都不相等</div>
+                    <div>三个角都不相等</div>
+                </div>
+            </div>
+
+            <div style="margin-bottom: 24px;">
+                <label style="display: block; margin-bottom: 8px;">📏 边长 A</label>
+                <input type="range" class="kid-slider" id="scaleneA" min="2" max="5" value="3" step="0.1" oninput="updateScalene()">
+                <div style="text-align: center; margin-top: 8px;">A: <span id="scaleneAVal">3</span></div>
+            </div>
+
+            <div style="margin-bottom: 24px;">
+                <label style="display: block; margin-bottom: 8px;">📏 边长 B</label>
+                <input type="range" class="kid-slider" id="scaleneB" min="2" max="5" value="4" step="0.1" oninput="updateScalene()">
+                <div style="text-align: center; margin-top: 8px;">B: <span id="scaleneBVal">4</span></div>
+            </div>
+
+            <div style="margin-bottom: 24px;">
+                <label style="display: block; margin-bottom: 8px;">📏 边长 C</label>
+                <input type="range" class="kid-slider" id="scaleneC" min="2" max="6" value="5" step="0.1" oninput="updateScalene()">
+                <div style="text-align: center; margin-top: 8px;">C: <span id="scaleneCVal">5</span></div>
+            </div>
+
+            <div class="info-box">
+                <h3 style="font-size: 16px; margin-bottom: 8px;">💡 小知识</h3>
+                <p style="font-size: 14px; line-height: 1.6;">
+                    任意三角形是最常见的三角形。注意：三条边必须满足三角形不等式（任意两边之和大于第三边）。
+                </p>
+            </div>
+        </div>
+
+        <button class="btn-kid" onclick="resetScene()" style="width: 100%; margin-top: 16px;">🔄 重置</button>
+
+        <div style="margin-top: 24px; padding: 16px; background: rgba(255,255,255,0.05); border-radius: 12px;">
+            <h3 style="font-size: 18px; margin-bottom: 12px;">❓ 问答测试</h3>
+            <div id="quiz-container"></div>
+        </div>
+    </aside>
+
+    <!-- 加载问答和任务系统模块 -->
+    <script src="../modules/quiz-system.js"></script>
+    <script src="../modules/task-system.js"></script>
+
+    <script>
+        let scene, camera, renderer, triangle;
+        let currentType = 'equilateral';
+
+        function init() {
+            const container = document.getElementById('canvas-container');
+            scene = new THREE.Scene();
+            camera = new THREE.PerspectiveCamera(60, window.innerWidth / window.innerHeight, 0.1, 1000);
+            camera.position.set(-2.5, 0, 8);
+            camera.lookAt(0, 0, 0);
+            renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
+            renderer.setSize(window.innerWidth, window.innerHeight);
+            container.appendChild(renderer.domElement);
+
+            const ambientLight = new THREE.AmbientLight(0xffffff, 0.6);
+            scene.add(ambientLight);
+            const directionalLight = new THREE.DirectionalLight(0xffffff, 0.8);
+            directionalLight.position.set(10, 10, 10);
+            scene.add(directionalLight);
+
+            createEquilateral();
+            window.addEventListener('resize', onWindowResize);
+            animate();
+        }
+
+        function createEquilateral() {
+            if (triangle) scene.remove(triangle);
+            const size = parseFloat(document.getElementById('equilateralSize').value);
+
+            const height = size * Math.sqrt(3) / 2;
+
+            const shape = new THREE.Shape();
+            shape.moveTo(0, height / 2);
+            shape.lineTo(-size / 2, -height / 2);
+            shape.lineTo(size / 2, -height / 2);
+            shape.lineTo(0, height / 2);
+
+            const geometry = new THREE.ShapeGeometry(shape);
+            const material = new THREE.MeshStandardMaterial({
+                color: 0x8B5CF6,
+                side: THREE.DoubleSide
+            });
+            triangle = new THREE.Mesh(geometry, material);
+            triangle.rotation.x = -Math.PI / 2;
+
+            // 添加边框
+            const edges = new THREE.EdgesGeometry(geometry);
+            const line = new THREE.LineSegments(edges, new THREE.LineBasicMaterial({ color: 0xffffff }));
+            triangle.add(line);
+
+            scene.add(triangle);
+        }
+
+        function createIsosceles() {
+            if (triangle) scene.remove(triangle);
+            const base = parseFloat(document.getElementById('isoBase').value);
+            const leg = parseFloat(document.getElementById('isoLeg').value);
+
+            const height = Math.sqrt(leg * leg - (base / 2) * (base / 2));
+
+            const shape = new THREE.Shape();
+            shape.moveTo(0, height / 2);
+            shape.lineTo(-base / 2, -height / 2);
+            shape.lineTo(base / 2, -height / 2);
+            shape.lineTo(0, height / 2);
+
+            const geometry = new THREE.ShapeGeometry(shape);
+            const material = new THREE.MeshStandardMaterial({
+                color: 0xEC4899,
+                side: THREE.DoubleSide
+            });
+            triangle = new THREE.Mesh(geometry, material);
+            triangle.rotation.x = -Math.PI / 2;
+
+            const edges = new THREE.EdgesGeometry(geometry);
+            const line = new THREE.LineSegments(edges, new THREE.LineBasicMaterial({ color: 0xffffff }));
+            triangle.add(line);
+
+            scene.add(triangle);
+        }
+
+        function createRight() {
+            if (triangle) scene.remove(triangle);
+            const a = parseFloat(document.getElementById('rightA').value);
+            const b = parseFloat(document.getElementById('rightB').value);
+            const c = Math.sqrt(a * a + b * b);
+
+            document.getElementById('rightC').textContent = c.toFixed(1);
+
+            const shape = new THREE.Shape();
+            shape.moveTo(0, b / 2);
+            shape.lineTo(-a / 2, -b / 2);
+            shape.lineTo(a / 2, -b / 2);
+            shape.lineTo(0, b / 2);
+
+            const geometry = new THREE.ShapeGeometry(shape);
+            const material = new THREE.MeshStandardMaterial({
+                color: 0x10B981,
+                side: THREE.DoubleSide
+            });
+            triangle = new THREE.Mesh(geometry, material);
+            triangle.rotation.x = -Math.PI / 2;
+
+            const edges = new THREE.EdgesGeometry(geometry);
+            const line = new THREE.LineSegments(edges, new THREE.LineBasicMaterial({ color: 0xffffff }));
+            triangle.add(line);
+
+            // 直角标记
+            const rightAngleShape = new THREE.Shape();
+            rightAngleShape.moveTo(0, 0);
+            rightAngleShape.lineTo(0.3, 0);
+            rightAngleShape.lineTo(0, 0.3);
+            rightAngleShape.lineTo(0, 0);
+
+            const raGeometry = new THREE.ShapeGeometry(rightAngleShape);
+            const raMaterial = new THREE.MeshBasicMaterial({ color: 0xEF4444 });
+            const rightAngle = new THREE.Mesh(raGeometry, raMaterial);
+            rightAngle.position.set(a / 2 - 0.2, -b / 2 + 0.2, 0.01);
+            triangle.add(rightAngle);
+
+            scene.add(triangle);
+        }
+
+        function createScalene() {
+            if (triangle) scene.remove(triangle);
+            const a = parseFloat(document.getElementById('scaleneA').value);
+            const b = parseFloat(document.getElementById('scaleneB').value);
+            const c = parseFloat(document.getElementById('scaleneC').value);
+
+            // 使用余弦定理计算角度
+            const cosA = (b * b + c * c - a * a) / (2 * b * c);
+            const cosB = (a * a + c * c - b * b) / (2 * a * c);
+            const angleA = Math.acos(Math.max(-1, Math.min(1, cosA)));
+            const angleB = Math.acos(Math.max(-1, Math.min(1, cosB)));
+
+            const shape = new THREE.Shape();
+            shape.moveTo(0, 0);
+            shape.lineTo(c, 0);
+            shape.lineTo(b * Math.cos(angleA), b * Math.sin(angleA));
+            shape.lineTo(0, 0);
+
+            const geometry = new THREE.ShapeGeometry(shape);
+            const material = new THREE.MeshStandardMaterial({
+                color: 0xF59E0B,
+                side: THREE.DoubleSide
+            });
+            triangle = new THREE.Mesh(geometry, material);
+            triangle.rotation.x = -Math.PI / 2;
+
+            const edges = new THREE.EdgesGeometry(geometry);
+            const line = new THREE.LineSegments(edges, new THREE.LineBasicMaterial({ color: 0xffffff }));
+            triangle.add(line);
+
+            scene.add(triangle);
+        }
+
+        function updateEquilateral() {
+            const size = document.getElementById('equilateralSize').value;
+            document.getElementById('equilateralSizeVal').textContent = size;
+            createEquilateral();
+        }
+
+        function updateIsosceles() {
+            document.getElementById('isoBaseVal').textContent = document.getElementById('isoBase').value;
+            document.getElementById('isoLegVal').textContent = document.getElementById('isoLeg').value;
+            createIsosceles();
+        }
+
+        function updateRight() {
+            document.getElementById('rightAVal').textContent = document.getElementById('rightA').value;
+            document.getElementById('rightBVal').textContent = document.getElementById('rightB').value;
+            createRight();
+        }
+
+        function updateScalene() {
+            document.getElementById('scaleneAVal').textContent = document.getElementById('scaleneA').value;
+            document.getElementById('scaleneBVal').textContent = document.getElementById('scaleneB').value;
+            document.getElementById('scaleneCVal').textContent = document.getElementById('scaleneC').value;
+            createScalene();
+        }
+
+        function switchTriangle(type) {
+            currentType = type;
+
+            document.querySelectorAll('.tab-btn').forEach(btn => btn.classList.remove('active'));
+            event.target.classList.add('active');
+
+            document.getElementById('equilateral-controls').style.display = 'none';
+            document.getElementById('isosceles-controls').style.display = 'none';
+            document.getElementById('right-controls').style.display = 'none';
+            document.getElementById('scalene-controls').style.display = 'none';
+
+            if (type === 'equilateral') {
+                document.getElementById('equilateral-controls').style.display = 'block';
+                createEquilateral();
+            } else if (type === 'isosceles') {
+                document.getElementById('isosceles-controls').style.display = 'block';
+                createIsosceles();
+            } else if (type === 'right') {
+                document.getElementById('right-controls').style.display = 'block';
+                createRight();
+            } else if (type === 'scalene') {
+                document.getElementById('scalene-controls').style.display = 'block';
+                createScalene();
+            }
+        }
+
+        function resetScene() {
+            document.getElementById('equilateralSize').value = 3;
+            document.getElementById('isoBase').value = 3;
+            document.getElementById('isoLeg').value = 4;
+            document.getElementById('rightA').value = 3;
+            document.getElementById('rightB').value = 4;
+            document.getElementById('scaleneA').value = 3;
+            document.getElementById('scaleneB').value = 4;
+            document.getElementById('scaleneC').value = 5;
+            updateEquilateral();
+            updateIsosceles();
+            updateRight();
+            updateScalene();
+        }
+
+        let isStaticMode = false;
+
+        function toggleStaticMode() {
+            isStaticMode = !isStaticMode;
+            const staticContainer = document.getElementById('static-container');
+            const canvasContainer = document.getElementById('canvas-container');
+
+            if (isStaticMode) {
+                staticContainer.classList.add('active');
+                canvasContainer.style.display = 'none';
+            } else {
+                staticContainer.classList.remove('active');
+                canvasContainer.style.display = 'block';
+            }
+        }
+
+        function toggleControls() {
+            document.getElementById('controls').classList.toggle('active');
+        }
+
+        function toggleTaskSidebar() {
+            if (window.taskSystem) {
+                window.taskSystem.toggle();
+            }
+        }
+
+        function onWindowResize() {
+            camera.aspect = window.innerWidth / window.innerHeight;
+            camera.updateProjectionMatrix();
+            renderer.setSize(window.innerWidth, window.innerHeight);
+        }
+
+        function animate() {
+            requestAnimationFrame(animate);
+
+            if (triangle) {
+                triangle.rotation.y += 0.003;
+            }
+
+            renderer.render(scene, camera);
+        }
+
+        document.addEventListener('DOMContentLoaded', () => {
+            // 初始化 Three.js 场景
+            init();
+
+            // 初始化问答系统
+            window.quizSystem = new QuizSystem({
+                lessonId: 'lesson-triangle',
+                container: document.getElementById('quiz-container'),
+                onAnswer: (result) => {
+                    console.log('Quiz answer:', result);
+                }
+            });
+
+            // 初始化任务系统
+            window.taskSystem = new TaskSystem({
+                lessonId: 'lesson-triangle',
+                container: document.getElementById('task-container'),
+                onTaskComplete: () => {
+                    console.log('Task completed!');
+                },
+                onGoalComplete: (goalId) => {
+                    console.log('Goal completed:', goalId);
+                }
+            });
+
+            // 默认隐藏任务侧边栏
+            window.taskSystem.hide();
+        });
+    </script>
+</body>
+</html>

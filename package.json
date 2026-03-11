@@ -1,0 +1,58 @@
+{
+  "name": "aetherviz-elementary-education",
+  "version": "2.0.0",
+  "description": "AetherViz 小学教学应用 - 3D交互式可视化教学平台 (React + Aceternity UI)",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "dev-legacy": "python3 dev-server.py",
+    "build": "tsc && vite build",
+    "preview": "vite preview",
+    "test": "vitest",
+    "lint": "eslint . --ext ts,tsx --report-unused-disable-directives --max-warnings 0"
+  },
+  "keywords": [
+    "education",
+    "3d",
+    "visualization",
+    "elementary",
+    "math",
+    "science",
+    "react",
+    "typescript"
+  ],
+  "author": "AetherViz Team",
+  "license": "MIT",
+  "dependencies": {
+    "@react-three/drei": "^9.105.0",
+    "@react-three/fiber": "^8.16.0",
+    "clsx": "^2.1.0",
+    "framer-motion": "^11.0.0",
+    "katex": "^0.16.9",
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1",
+    "react-router-dom": "^6.22.0",
+    "tailwind-merge": "^2.2.0",
+    "three": "^0.160.0",
+    "zustand": "^4.5.0"
+  },
+  "devDependencies": {
+    "@types/react": "^18.3.0",
+    "@types/react-dom": "^18.3.0",
+    "@types/three": "^0.160.0",
+    "@typescript-eslint/eslint-plugin": "^7.1.0",
+    "@typescript-eslint/parser": "^7.1.0",
+    "@vitejs/plugin-react": "^4.2.0",
+    "autoprefixer": "^10.4.17",
+    "eslint": "^8.57.0",
+    "eslint-plugin-react-hooks": "^4.6.0",
+    "eslint-plugin-react-refresh": "^0.4.5",
+    "postcss": "^8.4.35",
+    "tailwindcss": "^3.4.1",
+    "tailwindcss-animate": "^1.0.7",
+    "typescript": "^5.4.0",
+    "vite": "^5.1.0",
+    "vite-plugin-pwa": "^0.19.0",
+    "vitest": "^1.3.0"
+  }
+}

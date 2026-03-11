@@ -1,0 +1,839 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>对称图形 - AetherViz 小学教学</title>
+
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+
+    <!-- Three.js -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r134/three.min.js"></script>
+
+    <!-- 无障碍功能模块 -->
+    <script src="../modules/accessibility.js"></script>
+
+    <style>
+        :root {
+            --primary-gradient: linear-gradient(135deg, #EC4899 0%, #F59E0B 100%);
+            --bg-gradient: linear-gradient(180deg, #0F172A 0%, #701A75 50%, #9A3412 100%);
+            --glass-bg: rgba(255, 255, 255, 0.08);
+            --glass-border: rgba(255, 255, 255, 0.15);
+            --text-primary: #F8FAFC;
+            --text-secondary: #CBD5E1;
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Inter', -apple-system, sans-serif;
+            background: var(--bg-gradient);
+            color: var(--text-primary);
+            font-size: 18px;
+            overflow-x: hidden;
+        }
+
+        #canvas-container {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            z-index: 0;
+        }
+
+        #static-container {
+            position: fixed;
+            top: 70px;
+            left: 0;
+            width: 100%;
+            height: calc(100vh - 70px);
+            display: none;
+            justify-content: center;
+            align-items: center;
+            z-index: 1;
+            background: var(--bg-gradient);
+        }
+
+        #static-container.active {
+            display: flex;
+        }
+
+        .static-diagram {
+            max-width: 90%;
+            max-height: 90%;
+            background: rgba(255, 255, 255, 0.05);
+            border-radius: 20px;
+            padding: 40px;
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+        }
+
+        .navbar {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            height: 70px;
+            background: rgba(15, 23, 42, 0.85);
+            backdrop-filter: blur(10px);
+            border-bottom: 2px solid rgba(236, 72, 153, 0.3);
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 0 24px;
+            z-index: 100;
+        }
+
+        .navbar-title {
+            font-size: 32px;
+            font-weight: bold;
+            background: var(--primary-gradient);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+
+        .navbar-buttons {
+            display: flex;
+            gap: 12px;
+        }
+
+        .btn-kid {
+            min-width: 60px;
+            min-height: 60px;
+            padding: 16px 24px;
+            font-size: 18px;
+            border-radius: 12px;
+            border: none;
+            background: var(--primary-gradient);
+            color: white;
+            cursor: pointer;
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            transition: all 0.3s ease;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+        }
+
+        .btn-kid:hover {
+            transform: scale(1.05);
+        }
+
+        .btn-kid.active {
+            box-shadow: 0 0 20px rgba(236, 72, 153, 0.6);
+        }
+
+        .control-panel {
+            position: fixed;
+            right: 0;
+            top: 70px;
+            width: 30%;
+            height: calc(100vh - 70px);
+            background: rgba(112, 26, 117, 0.7);
+            backdrop-filter: blur(10px);
+            border-left: 1px solid rgba(236, 72, 153, 0.25);
+            padding: 24px;
+            overflow-y: auto;
+            z-index: 90;
+            transform: translateX(100%);
+            transition: transform 0.3s ease;
+        }
+
+        .control-panel.active {
+            transform: translateX(0);
+        }
+
+        .control-section {
+            margin-bottom: 24px;
+            padding: 16px;
+            background: var(--glass-bg);
+            border: 1px solid var(--glass-border);
+            border-radius: 12px;
+        }
+
+        .control-label {
+            font-size: 20px;
+            font-weight: 600;
+            margin-bottom: 12px;
+            display: block;
+            color: var(--text-primary);
+        }
+
+        .button-group {
+            display: flex;
+            gap: 8px;
+            flex-wrap: wrap;
+        }
+
+        .slider-wrapper {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            margin-top: 8px;
+        }
+
+        input[type="range"].kid-slider {
+            -webkit-appearance: none;
+            width: 100%;
+            height: 12px;
+            border-radius: 6px;
+            background: rgba(255, 255, 255, 0.2);
+            outline: none;
+            cursor: pointer;
+            flex: 1;
+        }
+
+        input[type="range"].kid-slider::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            width: 32px;
+            height: 32px;
+            border-radius: 50%;
+            background: var(--primary-gradient);
+            cursor: pointer;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
+        }
+
+        .slider-value {
+            min-width: 60px;
+            text-align: center;
+            font-size: 18px;
+            font-weight: 600;
+        }
+
+        .info-box {
+            background: rgba(236, 72, 153, 0.1);
+            border: 2px solid rgba(236, 72, 153, 0.3);
+            border-radius: 12px;
+            padding: 16px;
+            margin-top: 16px;
+        }
+
+        .info-title {
+            font-size: 22px;
+            font-weight: 700;
+            margin-bottom: 8px;
+            color: #EC4899;
+        }
+
+        .info-content {
+            font-size: 18px;
+            line-height: 1.6;
+            color: var(--text-secondary);
+        }
+
+        /* 移动端优化 */
+        @media (max-width: 640px) {
+            .navbar {
+                padding: 0 12px;
+                height: 56px;
+            }
+
+            .navbar-title {
+                font-size: 20px;
+            }
+
+            .btn-kid {
+                min-width: 44px;
+                min-height: 44px;
+                padding: 10px 12px;
+                font-size: 14px;
+            }
+
+            .control-panel {
+                width: 100%;
+                height: 50vh;
+                top: 56px;
+            }
+
+            body {
+                font-size: 16px;
+            }
+        }
+
+        /* 平板端优化 */
+        @media (min-width: 641px) and (max-width: 1024px) {
+            .control-panel {
+                width: 40%;
+            }
+
+            .navbar-title {
+                font-size: 26px;
+            }
+        }
+
+        /* 触摸设备优化 */
+        @media (hover: none) and (pointer: coarse) {
+            input[type="range"].kid-slider::-webkit-slider-thumb {
+                width: 40px;
+                height: 40px;
+            }
+
+            .btn-kid {
+                min-height: 48px;
+            }
+        }
+
+        /* 高对比度模式 */
+        .high-contrast {
+            --primary-gradient: linear-gradient(135deg, #FFFF00 0%, #FF9900 100%) !important;
+            --text-primary: #FFFFFF !important;
+            --text-secondary: #FFFF00 !important;
+        }
+
+        .high-contrast .control-panel {
+            background: rgba(0, 0, 0, 0.95) !important;
+            border: 3px solid #FFFFFF !important;
+        }
+
+        /* 减少动画模式 */
+        @media (prefers-reduced-motion: reduce) {
+            * {
+                animation-duration: 0.01ms !important;
+                animation-iteration-count: 1 !important;
+                transition-duration: 0.01ms !important;
+            }
+        }
+    </style>
+</head>
+<body>
+    <!-- 3D场景容器 -->
+    <div id="canvas-container"></div>
+
+    <!-- 静态展示容器 -->
+    <div id="static-container">
+        <div class="static-diagram">
+            <svg width="700" height="800" viewBox="0 0 700 800">
+                <!-- 标题 -->
+                <text x="350" y="40" text-anchor="middle" fill="#F8FAFC" font-size="32" font-weight="bold">
+                    对称图形
+                </text>
+
+                <!-- 轴对称部分 -->
+                <g transform="translate(50, 80)">
+                    <rect x="0" y="0" width="600" height="320" fill="rgba(255,255,255,0.05)" rx="15" stroke="rgba(236,72,153,0.3)" stroke-width="2"/>
+                    <text x="300" y="35" text-anchor="middle" fill="#EC4899" font-size="24" font-weight="bold">🦋 轴对称图形</text>
+
+                    <!-- 对称轴 -->
+                    <line x1="300" y1="60" x2="300" y2="300" stroke="#FBBF24" stroke-width="3" stroke-dasharray="10,5"/>
+                    <text x="300" y="315" text-anchor="middle" fill="#FBBF24" font-size="18">对称轴</text>
+
+                    <!-- 蝴蝶左半部分 -->
+                    <path d="M 200 150 Q 150 120 120 150 Q 100 180 120 210 Q 150 240 200 210" fill="#EC4899" stroke="#FFFFFF" stroke-width="2"/>
+                    <circle cx="160" cy="165" r="12" fill="#FFFFFF"/>
+                    <circle cx="160" cy="165" r="6" fill="#000000"/>
+
+                    <!-- 蝴蝶右半部分（虚线表示折叠） -->
+                    <path d="M 400 150 Q 450 120 480 150 Q 500 180 480 210 Q 450 240 400 210" fill="none" stroke="#EC4899" stroke-width="2" stroke-dasharray="5,5"/>
+                    <circle cx="440" cy="165" r="12" fill="none" stroke="#FFFFFF" stroke-width="2"/>
+                    <circle cx="440" cy="165" r="6" fill="none" stroke="#000000" stroke-width="2"/>
+
+                    <!-- 折叠箭头 -->
+                    <path d="M 350 180 Q 300 180 250 180" fill="none" stroke="#22C55E" stroke-width="3" marker-end="url(#arrowhead)"/>
+                </g>
+
+                <!-- 中心对称部分 -->
+                <g transform="translate(50, 420)">
+                    <rect x="0" y="0" width="600" height="320" fill="rgba(255,255,255,0.05)" rx="15" stroke="rgba(245,158,11,0.3)" stroke-width="2"/>
+                    <text x="300" y="35" text-anchor="middle" fill="#F59E0B" font-size="24" font-weight="bold">🔄 中心对称图形</text>
+
+                    <!-- 对称中心 -->
+                    <circle cx="300" cy="180" r="8" fill="#FBBF24" stroke="#FFFFFF" stroke-width="2"/>
+                    <text x="300" y="210" text-anchor="middle" fill="#FBBF24" font-size="18">对称中心</text>
+
+                    <!-- 平行四边形 -->
+                    <polygon points="180,120 320,120 420,240 140,240" fill="none" stroke="#22C55E" stroke-width="3"/>
+
+                    <!-- 对应点A和A' -->
+                    <circle cx="180" cy="120" r="12" fill="#EC4899"/>
+                    <text x="165" y="110" fill="#EC4899" font-size="20" font-weight="bold">A</text>
+
+                    <circle cx="420" cy="240" r="12" fill="#EC4899"/>
+                    <text x="435" y="250" fill="#EC4899" font-size="20" font-weight="bold">A'</text>
+
+                    <!-- 连接对应点的线 -->
+                    <line x1="180" y1="120" x2="420" y2="240" stroke="#FBBF24" stroke-width="2" stroke-dasharray="5,5"/>
+                    <text x="300" y="175" text-anchor="middle" fill="#FBBF24" font-size="16">连接对称中心</text>
+
+                    <!-- 旋转箭头 -->
+                    <path d="M 250 150 A 70 70 0 0 1 350 210" fill="none" stroke="#22C55E" stroke-width="3" marker-end="url(#arrowhead2)"/>
+                    <text x="380" y="140" fill="#22C55E" font-size="18">旋转180°</text>
+                </g>
+
+                <!-- 箭头定义 -->
+                <defs>
+                    <marker id="arrowhead" markerWidth="10" markerHeight="10" refX="9" refY="3" orient="auto">
+                        <polygon points="0 0, 10 3, 0 6" fill="#22C55E"/>
+                    </marker>
+                    <marker id="arrowhead2" markerWidth="10" markerHeight="10" refX="9" refY="3" orient="auto">
+                        <polygon points="0 0, 10 3, 0 6" fill="#22C55E"/>
+                    </marker>
+                </defs>
+            </svg>
+        </div>
+    </div>
+
+    <!-- 导航栏 -->
+    <nav class="navbar" role="navigation" aria-label="主导航">
+        <div class="navbar-title">🦋 对称图形</div>
+        <div class="navbar-buttons">
+            <button class="btn-kid" id="toggleControls" aria-label="切换控制面板" aria-expanded="false">
+                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M12 20v-6M6 20V10M18 20V4"/>
+                </svg>
+                控制
+            </button>
+            <button class="btn-kid" id="toggleStatic" aria-label="切换静态展示">
+                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <rect x="3" y="3" width="18" height="18" rx="2"/>
+                    <path d="M3 9h18M9 21V9"/>
+                </svg>
+                静态展示
+            </button>
+            <button class="btn-kid" href="index.html" aria-label="返回首页">
+                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M19 12H5M12 19l-7-7 7-7"/>
+                </svg>
+                返回
+            </button>
+        </div>
+    </nav>
+
+    <!-- 控制面板 -->
+    <div class="control-panel" id="controlPanel" role="complementary" aria-label="控制面板">
+        <div class="control-section">
+            <label class="control-label">🎨 选择对称类型</label>
+            <div class="button-group" role="group" aria-label="对称类型选择">
+                <button class="btn-kid active" data-type="axial" aria-pressed="true">
+                    🦋 轴对称
+                </button>
+                <button class="btn-kid" data-type="central" aria-pressed="false">
+                    🔄 中心对称
+                </button>
+                <button class="btn-kid" data-type="both" aria-pressed="false">
+                    ✨ 两者都有
+                </button>
+            </div>
+        </div>
+
+        <div class="control-section">
+            <label class="control-label" for="shapeSelect">📐 选择图形</label>
+            <div class="button-group" id="shapeSelect" role="group" aria-label="图形选择">
+                <!-- 动态生成 -->
+            </div>
+        </div>
+
+        <div class="control-section">
+            <label class="control-label" for="foldSlider">📄 折叠角度</label>
+            <div class="slider-wrapper">
+                <input type="range" class="kid-slider" id="foldSlider" min="0" max="180" value="0" aria-label="折叠角度">
+                <span class="slider-value" id="foldValue">0°</span>
+            </div>
+        </div>
+
+        <div class="control-section">
+            <label class="control-label" for="rotateSpeed">🔄 旋转速度</label>
+            <div class="slider-wrapper">
+                <input type="range" class="kid-slider" id="rotateSpeed" min="0" max="100" value="20" aria-label="旋转速度">
+                <span class="slider-value" id="rotateValue">20%</span>
+            </div>
+        </div>
+
+        <div class="info-box">
+            <div class="info-title" id="infoTitle">轴对称图形</div>
+            <div class="info-content" id="infoContent">
+                沿着一条直线对折后，直线两旁的部分能够完全重合的图形叫做轴对称图形。这条直线叫做对称轴。
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // ========== 全局变量 ==========
+        let scene, camera, renderer;
+        let currentShape = null;
+        let currentSymmetryType = 'axial';
+        let shapes = {};
+        let isStaticView = false;
+
+        // ========== 初始化Three.js场景 ==========
+        function initScene() {
+            // 创建场景
+            scene = new THREE.Scene();
+
+            // 创建相机
+            camera = new THREE.PerspectiveCamera(60, window.innerWidth / window.innerHeight, 0.1, 1000);
+            camera.position.set(0, 0, 10);
+
+            // 创建渲染器
+            renderer = new THREE.WebGLRenderer({ antialias: true });
+            renderer.setSize(window.innerWidth, window.innerHeight);
+            renderer.setPixelRatio(window.devicePixelRatio);
+            document.getElementById('canvas-container').appendChild(renderer.domElement);
+
+            // 添加光源
+            const ambientLight = new THREE.AmbientLight(0xffffff, 0.6);
+            scene.add(ambientLight);
+
+            const directionalLight = new THREE.DirectionalLight(0xffffff, 0.8);
+            directionalLight.position.set(10, 10, 10);
+            scene.add(directionalLight);
+
+            // 窗口大小调整
+            window.addEventListener('resize', onWindowResize);
+
+            // 创建初始图形
+            createSymmetryShapes();
+            showShape('butterfly');
+
+            // 开始动画循环
+            animate();
+        }
+
+        // ========== 创建对称图形 ==========
+        function createSymmetryShapes() {
+            // 蝴蝶（轴对称）
+            shapes.butterfly = createButterfly();
+
+            // 心形（轴对称）
+            shapes.heart = createHeart();
+
+            // 字母A（轴对称）
+            shapes.letterA = createLetterA();
+
+            // 平行四边形（中心对称）
+            shapes.parallelogram = createParallelogram();
+
+            // 正方形（两者都有）
+            shapes.square = createSquare();
+
+            // 圆形（两者都有）
+            shapes.circle = createCircle();
+        }
+
+        function createButterfly() {
+            const group = new THREE.Group();
+
+            // 左翅膀
+            const leftWingGeom = new THREE.Shape();
+            leftWingGeom.moveTo(0, 0);
+            leftWingGeom.bezierCurveTo(-1.5, -1, -2.5, 0.5, -2, 1.5);
+            leftWingGeom.bezierCurveTo(-1.5, 2, -0.5, 1.5, 0, 0);
+
+            const leftWing = new THREE.Mesh(
+                new THREE.ExtrudeGeometry(leftWingGeom, { depth: 0.1, bevelEnabled: true }),
+                new THREE.MeshPhongMaterial({ color: 0xEC4899, side: THREE.DoubleSide })
+            );
+            leftWing.position.set(-1, 0, 0);
+
+            // 右翅膀
+            const rightWingGeom = new THREE.Shape();
+            rightWingGeom.moveTo(0, 0);
+            rightWingGeom.bezierCurveTo(1.5, -1, 2.5, 0.5, 2, 1.5);
+            rightWingGeom.bezierCurveTo(1.5, 2, 0.5, 1.5, 0, 0);
+
+            const rightWing = new THREE.Mesh(
+                new THREE.ExtrudeGeometry(rightWingGeom, { depth: 0.1, bevelEnabled: true }),
+                new THREE.MeshPhongMaterial({ color: 0xEC4899, side: THREE.DoubleSide })
+            );
+            rightWing.position.set(1, 0, 0);
+
+            // 身体
+            const body = new THREE.Mesh(
+                new THREE.CylinderGeometry(0.1, 0.1, 2, 8),
+                new THREE.MeshPhongMaterial({ color: 0x000000 })
+            );
+            body.rotation.z = Math.PI / 2;
+
+            group.add(leftWing);
+            group.add(rightWing);
+            group.add(body);
+
+            group.userData.type = 'axial';
+            return group;
+        }
+
+        function createHeart() {
+            const group = new THREE.Group();
+
+            const heartShape = new THREE.Shape();
+            heartShape.moveTo(0, 0.5);
+            heartShape.bezierCurveTo(0, 0, -1.5, -1, -2, -0.5);
+            heartShape.bezierCurveTo(-2.5, 0, -2.5, 1.5, 0, 2.5);
+            heartShape.bezierCurveTo(2.5, 1.5, 2.5, 0, 2, -0.5);
+            heartShape.bezierCurveTo(1.5, -1, 0, 0, 0, 0.5);
+
+            const heart = new THREE.Mesh(
+                new THREE.ExtrudeGeometry(heartShape, { depth: 0.2, bevelEnabled: true }),
+                new THREE.MeshPhongMaterial({ color: 0xF472B6, side: THREE.DoubleSide })
+            );
+
+            group.add(heart);
+            group.userData.type = 'axial';
+            return group;
+        }
+
+        function createLetterA() {
+            const group = new THREE.Group();
+
+            // 左边
+            const leftBar = new THREE.Mesh(
+                new THREE.BoxGeometry(0.3, 3, 0.2),
+                new THREE.MeshPhongMaterial({ color: 0x22C55E })
+            );
+            leftBar.position.set(-1, 0, 0);
+            leftBar.rotation.z = 0.2;
+
+            // 右边
+            const rightBar = new THREE.Mesh(
+                new THREE.BoxGeometry(0.3, 3, 0.2),
+                new THREE.MeshPhongMaterial({ color: 0x22C55E })
+            );
+            rightBar.position.set(1, 0, 0);
+            rightBar.rotation.z = -0.2;
+
+            // 横杠
+            const crossBar = new THREE.Mesh(
+                new THREE.BoxGeometry(1.5, 0.3, 0.2),
+                new THREE.MeshPhongMaterial({ color: 0x22C55E })
+            );
+            crossBar.position.set(0, -0.5, 0);
+
+            group.add(leftBar);
+            group.add(rightBar);
+            group.add(crossBar);
+
+            group.userData.type = 'axial';
+            return group;
+        }
+
+        function createParallelogram() {
+            const group = new THREE.Group();
+
+            const shape = new THREE.Shape();
+            shape.moveTo(-1.5, -1);
+            shape.lineTo(-0.5, -1);
+            shape.lineTo(1.5, 1);
+            shape.lineTo(0.5, 1);
+            shape.closePath();
+
+            const mesh = new THREE.Mesh(
+                new THREE.ExtrudeGeometry(shape, { depth: 0.2, bevelEnabled: true }),
+                new THREE.MeshPhongMaterial({ color: 0x22C55E, side: THREE.DoubleSide })
+            );
+
+            group.add(mesh);
+            group.userData.type = 'central';
+            return group;
+        }
+
+        function createSquare() {
+            const group = new THREE.Group();
+
+            const square = new THREE.Mesh(
+                new THREE.BoxGeometry(3, 3, 0.2),
+                new THREE.MeshPhongMaterial({ color: 0xF59E0B, side: THREE.DoubleSide })
+            );
+
+            group.add(square);
+            group.userData.type = 'both';
+            return group;
+        }
+
+        function createCircle() {
+            const group = new THREE.Group();
+
+            const circle = new THREE.Mesh(
+                new THREE.CylinderGeometry(1.5, 1.5, 0.2, 32),
+                new THREE.MeshPhongMaterial({ color: 0x8B5CF6 })
+            );
+            circle.rotation.x = Math.PI / 2;
+
+            group.add(circle);
+            group.userData.type = 'both';
+            return group;
+        }
+
+        // ========== 显示图形 ==========
+        function showShape(shapeName) {
+            // 移除当前图形
+            if (currentShape) {
+                scene.remove(currentShape);
+            }
+
+            // 添加新图形
+            currentShape = shapes[shapeName];
+            scene.add(currentShape);
+
+            // 更新信息显示
+            updateInfoDisplay(shapeName);
+        }
+
+        function updateInfoDisplay(shapeName) {
+            const infoTitle = document.getElementById('infoTitle');
+            const infoContent = document.getElementById('infoContent');
+
+            const shapeInfo = {
+                butterfly: {
+                    title: '🦋 蝴蝶 - 轴对称',
+                    content: '蝴蝶是典型的轴对称图形。沿着身体中间对折，左右两边完全重合。蝴蝶的对称性不仅美观，还能帮助它保持平衡飞行。'
+                },
+                heart: {
+                    title: '❤️ 心形 - 轴对称',
+                    content: '心形是轴对称图形。沿着垂直中线对折，左右两边完全重合。心形在艺术和设计中广泛使用。'
+                },
+                letterA: {
+                    title: '🔤 字母A - 轴对称',
+                    content: '大写字母A是轴对称图形。沿着垂直中线对折，左右两边完全重合。还有哪些字母是对称的呢？'
+                },
+                parallelogram: {
+                    title: '📐 平行四边形 - 中心对称',
+                    content: '平行四边形是中心对称图形。绕着中心点旋转180°后，图形与原图形完全重合。'
+                },
+                square: {
+                    title: '🟧 正方形 - 两者都有',
+                    content: '正方形既是轴对称图形（有4条对称轴），又是中心对称图形。绕中心旋转90°、180°、270°都能与原图形重合。'
+                },
+                circle: {
+                    title: '🔵 圆形 - 两者都有',
+                    content: '圆形是最特殊的对称图形。它的任意一条直径都是对称轴（有无数条），绕圆心旋转任意角度都能重合。'
+                }
+            };
+
+            const info = shapeInfo[shapeName];
+            infoTitle.textContent = info.title;
+            infoContent.textContent = info.content;
+        }
+
+        // ========== 动画循环 ==========
+        function animate() {
+            requestAnimationFrame(animate);
+
+            if (currentShape && !isStaticView) {
+                const speed = parseInt(document.getElementById('rotateSpeed').value) / 5000;
+                currentShape.rotation.z += speed;
+            }
+
+            renderer.render(scene, camera);
+        }
+
+        // ========== 窗口大小调整 ==========
+        function onWindowResize() {
+            camera.aspect = window.innerWidth / window.innerHeight;
+            camera.updateProjectionMatrix();
+            renderer.setSize(window.innerWidth, window.innerHeight);
+        }
+
+        // ========== UI事件处理 ==========
+        function setupUIEvents() {
+            // 切换控制面板
+            document.getElementById('toggleControls').addEventListener('click', function() {
+                const panel = document.getElementById('controlPanel');
+                panel.classList.toggle('active');
+                this.setAttribute('aria-expanded', panel.classList.contains('active'));
+            });
+
+            // 切换静态展示
+            document.getElementById('toggleStatic').addEventListener('click', function() {
+                const staticContainer = document.getElementById('static-container');
+                staticContainer.classList.toggle('active');
+                isStaticView = staticContainer.classList.contains('active');
+                this.classList.toggle('active');
+            });
+
+            // 对称类型选择
+            document.querySelectorAll('[data-type]').forEach(btn => {
+                btn.addEventListener('click', function() {
+                    document.querySelectorAll('[data-type]').forEach(b => {
+                        b.classList.remove('active');
+                        b.setAttribute('aria-pressed', 'false');
+                    });
+                    this.classList.add('active');
+                    this.setAttribute('aria-pressed', 'true');
+
+                    currentSymmetryType = this.dataset.type;
+                    updateShapeButtons();
+                });
+            });
+
+            // 折叠角度滑块
+            document.getElementById('foldSlider').addEventListener('input', function() {
+                document.getElementById('foldValue').textContent = this.value + '°';
+                if (currentShape && currentSymmetryType === 'axial') {
+                    currentShape.rotation.y = (this.value * Math.PI) / 180;
+                }
+            });
+
+            // 旋转速度滑块
+            document.getElementById('rotateSpeed').addEventListener('input', function() {
+                document.getElementById('rotateValue').textContent = this.value + '%';
+            });
+
+            // 返回按钮
+            document.querySelector('[href="index.html"]').addEventListener('click', function(e) {
+                e.preventDefault();
+                window.location.href = 'index.html';
+            });
+        }
+
+        // ========== 更新图形按钮 ==========
+        function updateShapeButtons() {
+            const container = document.getElementById('shapeSelect');
+            container.innerHTML = '';
+
+            const shapeButtons = {
+                axial: [
+                    { id: 'butterfly', label: '🦋 蝴蝶', type: 'axial' },
+                    { id: 'heart', label: '❤️ 心形', type: 'axial' },
+                    { id: 'letterA', label: '🔤 字母A', type: 'axial' }
+                ],
+                central: [
+                    { id: 'parallelogram', label: '📐 平行四边形', type: 'central' }
+                ],
+                both: [
+                    { id: 'square', label: '🟧 正方形', type: 'both' },
+                    { id: 'circle', label: '🔵 圆形', type: 'both' }
+                ]
+            };
+
+            const buttons = shapeButtons[currentSymmetryType] || [];
+
+            buttons.forEach((btn, index) => {
+                const button = document.createElement('button');
+                button.className = 'btn-kid' + (index === 0 ? ' active' : '');
+                button.innerHTML = btn.label;
+                button.setAttribute('aria-pressed', index === 0 ? 'true' : 'false');
+                button.addEventListener('click', function() {
+                    container.querySelectorAll('.btn-kid').forEach(b => {
+                        b.classList.remove('active');
+                        b.setAttribute('aria-pressed', 'false');
+                    });
+                    this.classList.add('active');
+                    this.setAttribute('aria-pressed', 'true');
+                    showShape(btn.id);
+                });
+                container.appendChild(button);
+            });
+
+            // 默认显示第一个图形
+            if (buttons.length > 0) {
+                showShape(buttons[0].id);
+            }
+        }
+
+        // ========== 页面加载完成后初始化 ==========
+        document.addEventListener('DOMContentLoaded', function() {
+            initScene();
+            setupUIEvents();
+            updateShapeButtons();
+
+            // 初始化无障碍功能
+            if (window.A11y) {
+                window.A11y.addAriaLabels();
+            }
+        });
+    </script>
+</body>
+</html>
