@@ -1,0 +1,40 @@
+# Node modules
+node_modules
+
+# Development files
+.vscode
+.idea
+*.log
+.DS_Store
+
+# Test files
+**/*.test.ts
+**/*.test.tsx
+**/*.spec.ts
+**/*.spec.tsx
+**/coverage
+
+# Temporary files
+.temp
+dist
+.cache
+
+# Git
+.git
+.github
+
+# Documentation
+README.md
+*.md
+
+# Legacy files
+templates
+modules
+index-legacy.html
+dev-server.py
+temp
+
+# Config files (not needed for deployment)
+.eslintrc*
+.prettierrc*
+.editorconfig

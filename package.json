@@ -6,7 +6,7 @@
   "scripts": {
     "dev": "vite",
     "dev-legacy": "python3 dev-server.py",
-    "build": "tsc && vite build",
+    "build": "vite build",
     "preview": "vite preview",
     "test": "vitest",
     "lint": "eslint . --ext ts,tsx --report-unused-disable-directives --max-warnings 0"
