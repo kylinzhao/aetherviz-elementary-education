@@ -220,8 +220,8 @@ export default function LessonStates() {
               <span className="text-4xl">🗺️</span>
             </Sparkles>
             <div>
-              <h1 className="text-3xl font-bold gradient-text">美丽中国</h1>
-              <p className="text-sm text-yellow-300">小小旅行家</p>
+              <h1 className="text-3xl font-bold gradient-text">🧊 物质三态</h1>
+              <p className="text-sm text-yellow-300">探索物质的三种形态</p>
             </div>
           </div>
           <button
