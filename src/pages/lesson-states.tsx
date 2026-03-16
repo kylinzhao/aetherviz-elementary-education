@@ -1,4 +1,4 @@
-import React, { useRef, useState } from 'react';
+import React, { useRef, useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Canvas, useFrame } from '@react-three/fiber';
 import { OrbitControls, PerspectiveCamera } from '@react-three/drei';
@@ -7,71 +7,62 @@ import { ViewControlButtons } from '@/components/3d/ViewControls';
 import { TaskCard, Task } from '@/components/education/TaskCard';
 import { QuizGame, QuizQuestion } from '@/components/education/QuizGame';
 
-// 地图可视化组件
-function MapVisualization({ showMap, showProvinces, showCapitals }: {
-  showMap: boolean;
-  showProvinces: boolean;
-  showCapitals: boolean;
-}) {
-  const mapRef = React.useRef<THREE.Group>(null);
+// 物质三态可视化组件
+function MatterVisualization() {
+  const groupRef = useRef<THREE.Group>(null);
 
   useFrame((state) => {
-    if (mapRef.current) {
-      mapRef.current.rotation.y = Math.sin(state.clock.elapsedTime * 0.1) * 0.1;
+    if (groupRef.current) {
+      groupRef.current.rotation.y = state.clock.elapsedTime * 0.1;
     }
   });
 
   return (
-    <group ref={mapRef}>
-      {/* 中国地图轮廓 - 用立方体简化表示 */}
-      <mesh position={[0, 0, 0]}>
-        <boxGeometry args={[5, 3, 0.3]} />
-        <meshStandardMaterial color="#dc2626" />
-      </mesh>
+    <group ref={groupRef}>
+      {/* 固态 - 紧密排列的粒子 */}
+      <group position={[-3, 0, 0]}>
+        {Array.from({ length: 27 }).map((_, i) => {
+          const x = (i % 3) * 0.8 - 0.8;
+          const y = Math.floor(i / 3) % 3 * 0.8 - 0.8;
+          const z = Math.floor(i / 9) * 0.8 - 0.8;
+          return (
+            <mesh key={`solid-${i}`} position={[x, y, z]}>
+              <sphereGeometry args={[0.25, 16, 16]} />
+              <meshStandardMaterial color="#3b82f6" emissive="#3b82f6" emissiveIntensity={0.3} />
+            </mesh>
+          );
+        })}
+      </group>
 
-      {/* 省份标记 */}
-      {showProvinces && (
-        <>
-          <mesh position={[-1.5, 0.8, 0.3]}>
-            <sphereGeometry args={[0.3, 16, 16]} />
-            <meshStandardMaterial color="#fbbf24" emissive="#fbbf24" emissiveIntensity={0.5} />
-          </mesh>
-          <mesh position={[0.5, 1, 0.3]}>
-            <sphereGeometry args={[0.3, 16, 16]} />
-            <meshStandardMaterial color="#fbbf24" emissive="#fbbf24" emissiveIntensity={0.5} />
-          </mesh>
-          <mesh position={[1.5, -0.5, 0.3]}>
-            <sphereGeometry args={[0.3, 16, 16]} />
-            <meshStandardMaterial color="#fbbf24" emissive="#fbbf24" emissiveIntensity={0.5} />
-          </mesh>
-          <mesh position={[-0.8, -1, 0.3]}>
-            <sphereGeometry args={[0.3, 16, 16]} />
-            <meshStandardMaterial color="#fbbf24" emissive="#fbbf24" emissiveIntensity={0.5} />
-          </mesh>
-        </>
-      )}
+      {/* 液态 - 较松散排列的粒子 */}
+      <group position={[0, 0, 0]}>
+        {Array.from({ length: 20 }).map((_, i) => {
+          const x = (Math.random() - 0.5) * 2;
+          const y = (Math.random() - 0.5) * 2;
+          const z = (Math.random() - 0.5) * 2;
+          return (
+            <mesh key={`liquid-${i}`} position={[x, y, z]}>
+              <sphereGeometry args={[0.25, 16, 16]} />
+              <meshStandardMaterial color="#06b6d4" emissive="#06b6d4" emissiveIntensity={0.3} />
+            </mesh>
+          );
+        })}
+      </group>
 
-      {/* 省会标记 - 星星形状 */}
-      {showCapitals && (
-        <>
-          <mesh position={[-1.5, 0.8, 0.6]} rotation={[0, 0, Math.PI / 4]}>
-            <coneGeometry args={[0.15, 0.4, 5]} />
-            <meshStandardMaterial color="#fef08a" emissive="#fef08a" emissiveIntensity={0.8} />
-          </mesh>
-          <mesh position={[0.5, 1, 0.6]} rotation={[0, 0, Math.PI / 4]}>
-            <coneGeometry args={[0.15, 0.4, 5]} />
-            <meshStandardMaterial color="#fef08a" emissive="#fef08a" emissiveIntensity={0.8} />
-          </mesh>
-          <mesh position={[1.5, -0.5, 0.6]} rotation={[0, 0, Math.PI / 4]}>
-            <coneGeometry args={[0.15, 0.4, 5]} />
-            <meshStandardMaterial color="#fef08a" emissive="#fef08a" emissiveIntensity={0.8} />
-          </mesh>
-          <mesh position={[-0.8, -1, 0.6]} rotation={[0, 0, Math.PI / 4]}>
-            <coneGeometry args={[0.15, 0.4, 5]} />
-            <meshStandardMaterial color="#fef08a" emissive="#fef08a" emissiveIntensity={0.8} />
-          </mesh>
-        </>
-      )}
+      {/* 气态 - 自由扩散的粒子 */}
+      <group position={[3, 0, 0]}>
+        {Array.from({ length: 15 }).map((_, i) => {
+          const x = (Math.random() - 0.5) * 3;
+          const y = (Math.random() - 0.5) * 3;
+          const z = (Math.random() - 0.5) * 3;
+          return (
+            <mesh key={`gas-${i}`} position={[x, y, z]}>
+              <sphereGeometry args={[0.2, 16, 16]} />
+              <meshStandardMaterial color="#94a3b8" emissive="#94a3b8" emissiveIntensity={0.3} />
+            </mesh>
+          );
+        })}
+      </group>
     </group>
   );
 }
@@ -80,11 +71,21 @@ export default function LessonStates() {
   const navigate = useNavigate();
   const cameraRef = useRef<THREE.PerspectiveCamera>(null);
   const controlsRef = useRef<any>(null);
-  const [showMap, setShowMap] = useState(false);
-  const [showProvinces, setShowProvinces] = useState(false);
-  const [showCapitals, setShowCapitals] = useState(false);
+  const [selectedState, setSelectedState] = useState<'solid' | 'liquid' | 'gas'>('solid');
+  const [temperature, setTemperature] = useState(25);
   const [tasksCompleted, setTasksCompleted] = useState(false);
   const [quizScore, setQuizScore] = useState<number | null>(null);
+
+  // 根据温度自动切换状态
+  useEffect(() => {
+    if (temperature <= 0) {
+      setSelectedState('solid');
+    } else if (temperature >= 100) {
+      setSelectedState('gas');
+    } else {
+      setSelectedState('liquid');
+    }
+  }, [temperature]);
 
   // 视角控制函数
   const resetView = () => {
@@ -146,24 +147,24 @@ export default function LessonStates() {
   const tasks: Task[] = [
     {
       id: 1,
-      title: '认识中国地图',
-      description: '点击"显示地图"按钮，看看我们的祖国',
-      checkCondition: () => showMap === true,
-      hint: '太棒了！这就是我们祖国的形状，像一只雄鸡！',
+      title: '观察固体状态',
+      description: '点击"固体"按钮，观察粒子的排列方式',
+      checkCondition: () => selectedState === 'solid',
+      hint: '太棒了！固体的粒子紧密排列，像整齐的队伍！',
     },
     {
       id: 2,
-      title: '找找省份在哪里',
-      description: '点击"显示省份"按钮，看看有哪些省份',
-      checkCondition: () => showProvinces === true,
-      hint: '对啦！金色的圆点代表不同的省份！',
+      title: '探索液体状态',
+      description: '点击"液体"按钮，看看粒子如何运动',
+      checkCondition: () => selectedState === 'liquid',
+      hint: '对啦！液体的粒子可以自由流动，像一群小鱼！',
     },
     {
       id: 3,
-      title: '认识省会城市',
-      description: '点击"显示省会"按钮，学习省会城市',
-      checkCondition: () => showCapitals === true,
-      hint: '真聪明！星星标记的就是省会城市！',
+      title: '了解气体状态',
+      description: '点击"气体"按钮，观察粒子的运动速度',
+      checkCondition: () => selectedState === 'gas',
+      hint: '真聪明！气体的粒子快速运动，充满整个空间！',
     },
   ];
 
@@ -171,62 +172,62 @@ export default function LessonStates() {
   const quizQuestions: QuizQuestion[] = [
     {
       id: 1,
-      question: '🗺️ 中国地图像什么动物？',
-      options: ['兔子', '雄鸡', '老虎', '熊猫'],
+      question: '🧊 下面哪个是固体？',
+      options: ['水', '冰', '水蒸气', '空气'],
       correctAnswer: 1,
-      hint: '提示: 想想公鸡的头和尾巴',
-      explanation: '正确！中国地图像一只昂首挺胸的雄鸡！',
+      hint: '提示: 固体有固定的形状和体积',
+      explanation: '正确！冰是水的固体状态！',
     },
     {
       id: 2,
-      question: '⭐ 什么是省会城市？',
-      options: ['最大的城市', '省政府所在的城市', '人口最多的城市', '最古老的城市'],
-      correctAnswer: 1,
-      hint: '提示: 省会就是省政府所在的地方',
-      explanation: '太棒了！省会就是一个省的政治、经济中心！',
+      question: '💧 水在多少度结冰？',
+      options: ['100°C', '50°C', '0°C', '-10°C'],
+      correctAnswer: 2,
+      hint: '提示: 水在零度时变成冰',
+      explanation: '太棒了！水在0°C时结冰！',
     },
     {
       id: 3,
-      question: '🏙️ 下面哪个是直辖市？',
-      options: ['南京', '北京', '广州', '西安'],
-      correctAnswer: 1,
-      hint: '提示: 直辖市直接归中央政府管辖',
-      explanation: '对！北京是中华人民共和国的首都，也是直辖市！',
+      question: '💨 气体的特点是什么？',
+      options: ['有固定形状', '粒子紧密排列', '充满整个容器', '不能流动'],
+      correctAnswer: 2,
+      hint: '提示: 气体可以扩散到整个空间',
+      explanation: '对！气体的粒子自由扩散，充满整个容器！',
     },
     {
       id: 4,
-      question: '🌊 中国有多少个省级行政区？',
-      options: ['23个', '34个', '56个', '66个'],
-      correctAnswer: 1,
-      hint: '提示: 包括省、自治区、直辖市和特别行政区',
-      explanation: '真聪明！中国有34个省级行政区！',
+      question: '🌡️ 水在多少度沸腾？',
+      options: ['0°C', '50°C', '100°C', '150°C'],
+      correctAnswer: 2,
+      hint: '提示: 烧开水时的温度',
+      explanation: '真聪明！水在100°C时沸腾变成水蒸气！',
     },
     {
       id: 5,
-      question: '📍 你的家乡在哪里？',
-      options: ['东部', '南部', '西部', '北部'],
-      correctAnswer: 0,
-      hint: '提示: 根据你自己的实际情况回答',
-      explanation: '每个人都可以根据自己的实际情况回答这个问题！',
+      question: '🔄 冰变成水的过程叫什么？',
+      options: ['凝固', '熔化', '汽化', '液化'],
+      correctAnswer: 1,
+      hint: '提示: 固体变成液体的过程',
+      explanation: '正确！冰熔化成水！',
     },
   ];
 
   return (
-    <div className="min-h-screen bg-gradient-to-b from-red-900/30 via-orange-900/20 to-yellow-900/20">
+    <div className="min-h-screen bg-gradient-to-b from-cyan-900/30 via-blue-900/20 to-slate-900/20">
       <nav className="fixed top-0 left-0 right-0 z-50 glass-panel">
         <div className="container mx-auto px-6 py-4 flex items-center justify-between">
           <div className="flex items-center gap-4">
             <Sparkles>
-              <span className="text-4xl">🗺️</span>
+              <span className="text-4xl">🧊</span>
             </Sparkles>
             <div>
-              <h1 className="text-3xl font-bold gradient-text">🧊 物质三态</h1>
-              <p className="text-sm text-yellow-300">探索物质的三种形态</p>
+              <h1 className="text-3xl font-bold gradient-text">物质三态</h1>
+              <p className="text-sm text-cyan-300">探索物质的三种形态</p>
             </div>
           </div>
           <button
             onClick={() => navigate('/')}
-            className="px-6 py-2 bg-gradient-to-r from-red-500 to-yellow-500 rounded-lg font-bold hover:opacity-90 transition-opacity"
+            className="px-6 py-2 bg-gradient-to-r from-cyan-500 to-blue-500 rounded-lg font-bold hover:opacity-90 transition-opacity"
           >
             ← 返回首页
           </button>
@@ -238,16 +239,16 @@ export default function LessonStates() {
         <div className="max-w-7xl mx-auto">
           <div className="glass-panel rounded-2xl p-6 mb-6">
             <div className="flex items-start gap-4">
-              <span className="text-5xl">📖</span>
+              <span className="text-5xl">🔬</span>
               <div className="flex-1">
-                <h2 className="text-2xl font-bold text-white mb-2">小小旅行家</h2>
-                <p className="text-lg text-yellow-200 leading-relaxed">
-                  小明<span className="text-2xl mx-1">🧒</span>是个好奇的旅行家，
-                  他背起小书包<span className="text-2xl mx-1">🎒</span>，
-                  准备游遍我们伟大的祖国<span className="text-2xl mx-1">🇨🇳</span>！
+                <h2 className="text-2xl font-bold text-white mb-2">探索物质的世界</h2>
+                <p className="text-lg text-cyan-200 leading-relaxed">
+                  你有没有想过，为什么<span className="text-2xl mx-1">🧊</span>冰是硬的，
+                  <span className="text-2xl mx-1">💧</span>水会流动，
+                  而<span className="text-2xl mx-1">💨</span>空气看不见？
                   <br />
-                  <span className="text-yellow-300 font-bold">
-                    让我们一起认识地图、省份和省会城市吧！
+                  <span className="text-cyan-300 font-bold">
+                    让我们一起探索物质的奇妙三态吧！
                   </span>
                 </p>
               </div>
@@ -265,12 +266,13 @@ export default function LessonStates() {
               <div className="glass-panel rounded-2xl p-6">
                 <div className="flex items-center justify-between mb-4">
                   <h2 className="text-xl font-bold text-white flex items-center gap-2">
-                    🗺️ 中国地图
+                    🧪 物质三态演示
                   </h2>
                   <div className="text-center">
-                    <div className="text-sm text-yellow-300">
-                      {showMap && '🇨🇳 美丽中国'}
-                      {!showMap && '点击显示地图'}
+                    <div className="text-sm text-cyan-300">
+                      {selectedState === 'solid' && '🧊 固态'}
+                      {selectedState === 'liquid' && '💧 液态'}
+                      {selectedState === 'gas' && '💨 气态'}
                     </div>
                   </div>
                 </div>
@@ -288,12 +290,12 @@ export default function LessonStates() {
                     <PerspectiveCamera makeDefault ref={cameraRef} position={[8, 6, 10]} fov={60} />
                     <ambientLight intensity={0.6} />
                     <directionalLight position={[10, 20, 10]} castShadow />
-                    <MapVisualization showMap={showMap} showProvinces={showProvinces} showCapitals={showCapitals} />
+                    <MatterVisualization />
                     <OrbitControls ref={controlsRef} enableDamping dampingFactor={0.05} />
                   </Canvas>
                 </div>
-                <p className="text-yellow-200 text-sm mt-4 text-center">
-                  💡 认识我们的祖国，了解中国的版图！
+                <p className="text-cyan-200 text-sm mt-4 text-center">
+                  💡 观察三种状态下粒子的排列和运动！
                 </p>
               </div>
 
@@ -313,95 +315,105 @@ export default function LessonStates() {
                   🎛️ 控制面板
                 </h2>
 
-                {/* 地图开关 */}
+                {/* 状态切换 */}
                 <div className="space-y-4 mb-6">
                   <label className="block text-white font-bold text-lg flex items-center gap-2">
-                    🗺️ 地图显示
+                    🧊 物质状态
                   </label>
-                  <button
-                    onClick={() => setShowMap(!showMap)}
-                    className={`w-full p-3 rounded-lg font-bold transition-all ${
-                      showMap
-                        ? 'bg-red-500 text-white'
-                        : 'bg-slate-700 text-slate-300 hover:bg-slate-600'
-                    }`}
-                  >
-                    {showMap ? '隐藏地图' : '显示地图'}
-                  </button>
+                  <div className="grid grid-cols-3 gap-2">
+                    <button
+                      onClick={() => setSelectedState('solid')}
+                      className={`p-3 rounded-lg font-bold transition-all ${
+                        selectedState === 'solid'
+                          ? 'bg-blue-500 text-white'
+                          : 'bg-slate-700 text-slate-300 hover:bg-slate-600'
+                      }`}
+                    >
+                      固体
+                    </button>
+                    <button
+                      onClick={() => setSelectedState('liquid')}
+                      className={`p-3 rounded-lg font-bold transition-all ${
+                        selectedState === 'liquid'
+                          ? 'bg-cyan-500 text-white'
+                          : 'bg-slate-700 text-slate-300 hover:bg-slate-600'
+                      }`}
+                    >
+                      液体
+                    </button>
+                    <button
+                      onClick={() => setSelectedState('gas')}
+                      className={`p-3 rounded-lg font-bold transition-all ${
+                        selectedState === 'gas'
+                          ? 'bg-slate-500 text-white'
+                          : 'bg-slate-700 text-slate-300 hover:bg-slate-600'
+                      }`}
+                    >
+                      气体
+                    </button>
+                  </div>
                 </div>
 
-                {/* 省份开关 */}
+                {/* 温度调节 */}
                 <div className="space-y-4 mb-6">
                   <label className="block text-white font-bold text-lg flex items-center gap-2">
-                    📍 省份标记
+                    🌡️ 温度调节
                   </label>
-                  <button
-                    onClick={() => setShowProvinces(!showProvinces)}
-                    className={`w-full p-3 rounded-lg font-bold transition-all ${
-                      showProvinces
-                        ? 'bg-yellow-500 text-white'
-                        : 'bg-slate-700 text-slate-300 hover:bg-slate-600'
-                    }`}
-                  >
-                    {showProvinces ? '隐藏省份' : '显示省份'}
-                  </button>
+                  <input
+                    type="range"
+                    min="-20"
+                    max="120"
+                    value={temperature}
+                    onChange={(e) => setTemperature(parseInt(e.target.value))}
+                    className="w-full"
+                  />
+                  <div className="text-center p-3 bg-gradient-to-br from-cyan-500/10 to-blue-500/10 rounded-lg">
+                    <div className="text-3xl font-bold text-cyan-300">{temperature}°C</div>
+                    <div className="text-sm text-slate-300 mt-1">
+                      {temperature <= 0 && '❄️ 固态（冰）'}
+                      {temperature > 0 && temperature < 100 && '💧 液态（水）'}
+                      {temperature >= 100 && '💨 气态（水蒸气）'}
+                    </div>
+                  </div>
                 </div>
 
-                {/* 省会开关 */}
-                <div className="space-y-4 mb-6">
-                  <label className="block text-white font-bold text-lg flex items-center gap-2">
-                    ⭐ 省会城市
-                  </label>
-                  <button
-                    onClick={() => setShowCapitals(!showCapitals)}
-                    className={`w-full p-3 rounded-lg font-bold transition-all ${
-                      showCapitals
-                        ? 'bg-yellow-500 text-white'
-                        : 'bg-slate-700 text-slate-300 hover:bg-slate-600'
-                    }`}
-                  >
-                    {showCapitals ? '隐藏省会' : '显示省会'}
-                  </button>
-                </div>
-
-                {/* 地图的知识 */}
-                <div className="p-4 bg-gradient-to-br from-red-500/10 to-orange-500/10 border-2 border-red-500/30 rounded-lg mb-6">
-                  <h3 className="font-bold text-red-400 mb-3 flex items-center gap-2">
-                    📖 什么是地图？
+                {/* 物质状态知识 */}
+                <div className="p-4 bg-gradient-to-br from-cyan-500/10 to-blue-500/10 border-2 border-cyan-500/30 rounded-lg mb-6">
+                  <h3 className="font-bold text-cyan-400 mb-3 flex items-center gap-2">
+                    📖 什么是物质三态？
                   </h3>
                   <div className="text-sm text-slate-200 space-y-2">
-                    <p className="text-red-300">
-                      地图就是<span className="font-bold">从天空看地面</span>的画！
+                    <p className="text-cyan-300">
+                      物质有<span className="font-bold">三种状态</span>：固体、液体和气体！
                     </p>
                     <p className="text-white text-base leading-relaxed">
-                      地图上标明了<span className="text-yellow-300 font-bold">山川、河流、城市</span>的位置，
-                      帮助我们<span className="text-yellow-300 font-bold">认识世界</span>！
+                      <span className="text-cyan-300 font-bold">温度</span>会让物质从一种状态变成另一种状态！
                     </p>
                   </div>
                 </div>
 
-                {/* 地图要素 */}
-                <div className="p-4 bg-gradient-to-br from-yellow-500/10 to-orange-500/10 border-2 border-yellow-500/30 rounded-lg">
-                  <h3 className="font-bold text-yellow-400 mb-2 flex items-center gap-2">
-                    💡 地图三要素
+                {/* 状态特点 */}
+                <div className="p-4 bg-gradient-to-br from-blue-500/10 to-slate-500/10 border-2 border-blue-500/30 rounded-lg">
+                  <h3 className="font-bold text-blue-400 mb-2 flex items-center gap-2">
+                    💡 三态特点
                   </h3>
                   <ul className="text-slate-200 text-sm space-y-2">
                     <li className="flex items-start gap-2">
-                      <span className="text-yellow-400">•</span>
+                      <span className="text-blue-400">🧊</span>
                       <span>
-                        <span className="text-white font-bold">方向：</span>上北下南，左西右东
+                        <span className="text-white font-bold">固体：</span>粒子紧密排列，有固定形状
                       </span>
                     </li>
                     <li className="flex items-start gap-2">
-                      <span className="text-yellow-400">•</span>
+                      <span className="text-cyan-400">💧</span>
                       <span>
-                        <span className="text-white font-bold">比例尺：</span>图上距离与实际距离的比
+                        <span className="text-white font-bold">液体：</span>粒子可以流动，无固定形状
                       </span>
                     </li>
                     <li className="flex items-start gap-2">
-                      <span className="text-yellow-400">•</span>
+                      <span className="text-slate-400">💨</span>
                       <span>
-                        <span className="text-white font-bold">图例：</span>地图上的符号说明
+                        <span className="text-white font-bold">气体：</span>粒子快速运动，充满容器
                       </span>
                     </li>
                   </ul>
@@ -410,7 +422,7 @@ export default function LessonStates() {
 
               {/* 小测验游戏 */}
               <QuizGame
-                title="地理挑战赛"
+                title="物质三态挑战"
                 questions={quizQuestions}
                 onComplete={(score, total) => {
                   setQuizScore(score);
@@ -426,15 +438,15 @@ export default function LessonStates() {
         <div className="fixed inset-0 bg-black/70 flex items-center justify-center z-50 p-6">
           <div className="glass-panel rounded-3xl p-8 max-w-lg w-full text-center animate-bounce">
             <div className="text-8xl mb-4">🏆</div>
-            <h2 className="text-4xl font-bold text-yellow-400 mb-4">太棒了！</h2>
-            <p className="text-2xl text-white mb-2">你是个小小旅行家！</p>
-            <p className="text-xl text-yellow-300 mb-4">
+            <h2 className="text-4xl font-bold text-cyan-400 mb-4">太棒了！</h2>
+            <p className="text-2xl text-white mb-2">你是个小小科学家！</p>
+            <p className="text-xl text-cyan-300 mb-4">
               测验得分：{quizScore} / 5 {'⭐'.repeat(quizScore)}
             </p>
-            <p className="text-lg text-red-300 mb-6">你真是个地理小达人！</p>
+            <p className="text-lg text-blue-300 mb-6">你已经掌握了物质三态的知识！</p>
             <button
               onClick={() => navigate('/')}
-              className="px-8 py-4 bg-gradient-to-r from-red-500 to-yellow-500 rounded-xl font-bold text-xl text-white hover:opacity-90 transition-opacity"
+              className="px-8 py-4 bg-gradient-to-r from-cyan-500 to-blue-500 rounded-xl font-bold text-xl text-white hover:opacity-90 transition-opacity"
             >
               继续探索其他课程 →
             </button>
